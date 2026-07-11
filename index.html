@@ -4,6 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Cartoon Shuffler</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cartoon Shuffler">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0A0B14">
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAAKaUlEQVR4nO3dzY4kRxWG4TdKvZvZeg0SXABbhA3D2J7GkodpsQXBArgLLgYw3mA2dg82DJbBxvwKiQ0rDOICvJ1ZB4vKrIrK38iqrjonIr9v00fl6OrInEfpUxHZneEn34uRGAEIbL+O1QGACDGp58YCIaZj+993+Brs59P/vrD7SXFiPmNjm3pgPqNjd0Nj3thm/m09fE6H5jN//tP5zI9Nzm9cMLaZ/67O+TceOf+DY5nykBzjkR42wizMtWAG2GQfqDALs3PMxMhGmEdqYS4O87blmDtQYRbmQjBDHG85hDljbDN/YfaBGRhuOYQ5Y2wzf2H2g3mw5RDmjLHN/IXZF2botBzCnDG2mb8w+8McSFoOYc4Y28xfmH1iht069NjkhVmY07H97/OEGSIbYc4Y28xfmH1jDsBGmIW5FswAG2GeGNvMX5jLwAxpyzF3oJOTF2Zh7teXxhxi23LMHejk5IVZmPu1BWaYuNtOmDk4xsNamD1ihpG77YSZg2M8rIXZK+bA1Nb35OSFWZj7tTVmGNv6npy8MAtzv/aAOTC09T05eWEW5n7tBTN0t74nJy/MwtyvPWGG7jq0MHdqYS4JcyBdhxbmTi3MpWGGtuUQ5k4tzCVihshGmLu1MJeKOXCw9T1zoIsnL8zC3KnPjJk4tMohzKQnU5iTY3SOGUbuthPmqbHC7BVzYOBuO2GeGivMnjEDE1vfiycvzMLcqS+MORBHtr4XT16YhblTG2CGwQ+FSycvzMLcqY0wQ+9D4dLJC7Mwd2pDzIHuOrQwC3PBmCFtOYRZmAvHDG3LIczCXAHmwMEzVnImJMzC3KkdYYaxVQ5hFuYCMROHVjmEWZgLxRwYuNtOmBHm3thO7RQzdFoOYUaYe2M7tWPMgaTlEGaEuTe2UzvHDE3LIcwIc29spy4AM8BViZh/+M4XUS6Tj779h2IwByJX3R/sFfOP3vkCyuXz8L0Hu/r3jz9yjRkOWg5hVqbzzduHeMYMu5bDJ+YfC7K7PLh9FYCPH3/oDnMgjj1jZWZCwrz6fOP2tabygxkGn7EyMyFhVpp8/fY1V5ghe+u7qS+4mqGUFB+YQ8za+t4P1gdApZtXnr7uBjPMbn2ng4VZGc7LTx+5wByI+1UOa8yn5N79l058B6XNi+efn/DdtpgBrrxgTiecG0G++7TndDlse8xA+6Fw4Ic4384W5vNm6fn92tNvNZUd5mYdeuCH6MqscMx5tsUMQ3fbCbOSZMn5tsYM3ZbDCPMxsBWHMcZ82HIUgFlXZ5vkn3dbzNC2HOaYdYWuIdaYgeFnrFwa86nr0IqfWGLe322HMCunxxozMXfre/uF82FWy1FP7DAHJn/rO6nPjDnIcyWxxQyjv/Wd1MKsZMYaM0xtfW+/cAnMWoeuKXaYx7e+t18QZmVZbDHDWMshzMoRscYMQy2HAWbBriiGmPsthzArp8QYM6QthzArJ8YaM7QthzHm0mG/ePu+9RTcxBLztuUQ5jvJi7fvrx62NWbo/G07O8x1oAZdrcEOc4hkbn3DWTHXdoPSmq/WlpghZmx9w/kx13OBPsjaYFtjhrmtb7gI5lr66LGsCTXYYe6vQ3drYb6zrOVqbYkZpu62E+azpGbU1phhrOUwfEDPGlL31doO83DLIcwXS32wbTFDt+UQZpPUgtoaM6Qth5PnAK41tVytLTEH2se6CbN57n33ufUUTo41ZoCNMNunBsxprDAHkifJWmJeK+zaIIMtZmLTcgjzZVMjZLDHDLDxgDl9EHztqRVzGivMAdpnfQvzubMGyGCLubnbTpjPHWEe+e+d+lTMAFceMNfaR68FcjdWmJOWQ5jvMmuFDLaYm5ZDmO8ywmyHGZJ1aEvMNcBeM+RdjDEHes9YEeZjIszbWGOGg2esCLNyN7HCHNg9Y8UWs2DXE0vMA+vQwqwcH2vMxNGt78tiru3vcqw9VpgDtB8KjTGvZMdwDbHEPNNyCLOyLNaYYe5uuwthVstRV6wwj7QcFph1la4llpjH77YTZuWIWGOGg5bDDrOW7uqJJeak5RBm5fRYY25aDmFW7iq2mLdb383rlphzYb94/nnWOOVus+S8W2LeXqELwaz4jzVmyNr6Pj/mJevQukpfNsecbyvMIc5ufV8K87KrtFBfJqVhHliHNsIc4b2bf7AkQn3eLD2//77+hTlmOPitbzvMx26wtCf93v2XFn+vMpxjLxQeMAcG/9BMGZjT6GrtJ5aYJ1uOS2MOwO3N31HKy2fXbwH2mGFklcMCc1s/vfkbSjnxhDkwsMphiVlr0mXGC+Zey+EBcwB+ffNXFP/57PotV5gDScvhBXP72vtPhNpzPGKGZpXDG+Z28u8/+QsBeOPdr6L4iLeeOcUMkY1XzOnrHzz5M4p9vGOeXYfOm/x5Mbf1b578affa9bsvo1wmXnYAczDPPGPFD+bugT578unkyewdaDP/obEPbl9lLp+++Wz8fdnfT56+vj83xz5LvfMeTfmVD74zO99/vfHL5vwv+L/vwfk/1kP/PS6JGTLutvOGee5kLsG8HzsXH5izlzVXijkwc7edMLfHOPC+XjFnvW+dmGFq63t08jVhzkdSCuY0a8MMY1vfo5OvC/NJLYcB5ru8SteIebDlEOZ+hLkMzNDd+h4dXCvmfCSlYE6zNsyBdOt7dHC9mMP+0GbiA/OpV+naMQPtFXpssDDv53P4HsLsDzPE9u9yrBVzJpKCMKdZG+YAbNaMef/6XHxgPuYqvSbMAOFXN/+MtWHO2c5WtvnP9c+BOjATY/vgzTowP7h9iLIsX/7t9wH476OfAWVj3rYclWAmmb9yXErHDMxsfReEWW3GafnSsx9QOmaIE1vfBWHej1VOTcmYm5ajPRBhXntKxwxDW99FYo588vhDlOPzv0c/pXTMge7Wd6GYdZW+i5SPGdrf+s6avHfMkT+++TsAXnn6Okpearkyt69d1YI53QH09DuA2TuAccFYuud/Zmwz/12d829cIOZAuw5dEebZsbu3FebaMAPtM1YyDzR78sIszOnYpD4jZmjvthNmYa4Ac/OMFWEW5jowQ3qDvzALc+GYoddyCLMw9+tSMAcG7rYT5u5YYS4FMzCy9Z09eWEW5nRsUhtgDsSBre/syQuzMKdjk9oIMwx9KBTmiVqYPWOG7odCYZ6ohdk75kD6oVCYJ2phLgEztC2HME/UwlwKZohshHmqFuaSMB+2HHMHetLkhVmYOTtm4uDW98CBnjR5YRZmLoIZRu62E+bcscLsCXNgoOUQ5tyxwuwNM3RaDmHOHSvMHjEHkpZDmHPHCrNXzNC0HMKcO1aYPWMGBj4UCrMwp3VBmAOx86FQmIU5rQvDDLPPWMmZvDALMy4ww+QzVnImL8zCjBvMgdFnrORMXpiFGVeYYXbre2zywizMuMNMnNz6Hpu8MAszLjFvWw5hFuZKMMPg1vfYYGEWZlxjDvS2vscGC7Mw4x4zHGx9jw0WZmGmCMyw2/oeGyzMwkwxmAOxfQqWMGeNRZg9Y4ZuyyHMk7UwT4x1gBnSlkOYJ2thnhjrBHMg8n/4QaNVAgXCzwAAAABJRU5ErkJggg==">
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -31,6 +38,7 @@
     min-height: 100vh;
   }
   .wrap { max-width: 900px; margin: 0 auto; padding: 28px 18px 90px; }
+
   header { text-align: center; margin-bottom: 26px; }
   header h1 {
     font-family: 'Sora', sans-serif;
@@ -44,6 +52,7 @@
     color: transparent;
   }
   header p { font-size: 0.92rem; margin-top: 10px; color: var(--text-dim); }
+
   .panel {
     background: var(--bg-elev);
     border: 1px solid var(--border);
@@ -61,6 +70,7 @@
     align-items: center;
     gap: 8px;
   }
+
   input, select, button { font-family: inherit; font-size: 0.95rem; }
   input[type="text"], select {
     border: 1px solid var(--border);
@@ -75,6 +85,7 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
+
   .btn {
     font-family: 'Sora', sans-serif;
     font-weight: 700;
@@ -93,10 +104,14 @@
   .btn-ghost { background: var(--bg-elev-2); border: 1px solid var(--border); box-shadow: none; }
   .btn-small { padding: 7px 14px; font-size: 0.78rem; border-radius: 10px; }
   .btn-teal { background: var(--teal); color: #05231d; box-shadow: 0 6px 16px rgba(34,211,180,0.3); }
+
   .row { display: flex; gap: 10px; }
   .row > * { flex: 1; }
+
   .error-msg { color: var(--accent-2); font-size: 0.85rem; margin-top: 10px; font-weight: 600; }
   .empty { text-align: center; padding: 22px; color: var(--text-dim); font-size: 0.9rem; }
+
+  /* Search results */
   .search-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(126px, 1fr)); gap: 14px; margin-top: 16px; }
   .show-card {
     position: relative;
@@ -114,6 +129,8 @@
   }
   .show-card .title { font-size: 0.78rem; font-weight: 700; line-height: 1.2; margin-bottom: 8px; }
   .show-card .btn-small { width: 100%; text-align: center; }
+
+  /* Shuffle list — horizontal scroll strip */
   .list-count-badge {
     background: var(--gradient); color: white; font-size: 0.7rem; font-weight: 700;
     padding: 2px 9px; border-radius: 20px; font-family: 'Sora', sans-serif;
@@ -132,8 +149,11 @@
     background: var(--accent-2); color: white; border: 2px solid var(--bg-elev); font-weight: 700; font-size: 0.85rem;
     display: flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1;
   }
+
+  /* Now Playing card */
   .region-row { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 16px; font-size: 0.8rem; color: var(--text-dim); }
   .region-row select { width: auto; padding: 6px 10px; }
+
   .now-playing {
     border-radius: 20px;
     background: var(--bg-elev-2);
@@ -156,6 +176,7 @@
   .np-show-title { font-family: 'Sora', sans-serif; font-size: 1.5rem; font-weight: 800; color: var(--gold); }
   .np-ep-line { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; margin: 6px 0 16px; color: var(--teal); }
   .np-hint { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 14px; }
+
   .providers { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 0 0 16px; }
   .provider-tag {
     background: var(--bg-elev); color: var(--text); font-size: 0.75rem; font-weight: 700;
@@ -166,6 +187,7 @@
   }
   .provider-tag:hover { transform: translateY(-1px); border-color: var(--accent); }
   .provider-tag.dim { background: transparent; color: var(--text-dim); }
+
   .timer-box { padding: 16px 20px 20px; border-top: 1px solid var(--border); }
   .timer-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
   .timer-clock { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.1rem; color: var(--gold); }
@@ -173,6 +195,7 @@
   .progress-track { height: 6px; border-radius: 6px; background: var(--bg-elev); overflow: hidden; margin-bottom: 14px; }
   .progress-fill { height: 100%; background: var(--gradient); width: 0%; transition: width 1s linear; }
   .timer-controls { display: flex; justify-content: center; gap: 10px; }
+
   .up-next-banner {
     background: linear-gradient(90deg, rgba(124,92,255,0.18), rgba(255,62,127,0.18));
     border: 1px solid var(--accent);
@@ -187,7 +210,19 @@
     0%, 100% { box-shadow: 0 0 0px rgba(124,92,255,0.0); }
     50% { box-shadow: 0 0 18px rgba(124,92,255,0.35); }
   }
+
   .tv-controls-bottom { display: flex; justify-content: center; padding: 18px 0 4px; }
+
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+  .history-item {
+    display: flex; align-items: baseline; gap: 8px;
+    border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px;
+    background: var(--bg-elev-2); font-size: 0.82rem;
+  }
+  .history-item .h-title { font-weight: 700; font-family: 'Sora', sans-serif; }
+  .history-item .h-ep { color: var(--teal); font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
+  .history-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+
   footer { text-align: center; font-size: 0.72rem; color: var(--text-dim); margin-top: 36px; line-height: 1.6; }
 </style>
 </head>
@@ -197,6 +232,7 @@
     <h1>📺 Cartoon Shuffler</h1>
     <p>Add cartoons you can watch, hit shuffle, land on a random episode.</p>
   </header>
+
   <div class="panel" id="search-panel" style="display:none;">
     <h2>🔍 Find cartoons</h2>
     <div class="row">
@@ -206,11 +242,13 @@
     <div class="error-msg" id="search-error"></div>
     <div class="search-results" id="search-results"></div>
   </div>
+
   <div class="panel" id="list-panel" style="display:none;">
     <h2>📋 Your Shuffle List <span class="list-count-badge" id="list-count">0</span></h2>
     <div class="list-strip" id="list-items"></div>
     <div class="empty" id="list-empty">Nothing here yet — search above and add a few cartoons.</div>
   </div>
+
   <div class="panel" id="shuffle-panel" style="display:none;">
     <h2>🎲 Shuffle</h2>
     <div class="region-row">
@@ -222,6 +260,7 @@
         <option value="AU">Australia</option>
       </select>
     </div>
+
     <div class="now-playing" id="now-playing">
       <div class="np-backdrop">
         <div class="np-content" id="np-content">
@@ -241,16 +280,28 @@
         </div>
       </div>
     </div>
+
     <div class="tv-controls-bottom">
       <button class="btn" id="shuffle-btn" style="font-size:1.05rem; padding:13px 30px;">🔀 Shuffle</button>
     </div>
     <div class="error-msg" id="shuffle-error"></div>
   </div>
+
+  <div class="panel" id="history-panel" style="display:none;">
+    <div class="history-header-row">
+      <h2 style="margin:0;">🕘 Recently Watched</h2>
+      <button class="btn btn-ghost btn-small" id="clear-history-btn">Clear</button>
+    </div>
+    <div class="history-list" id="history-list"></div>
+    <div class="empty" id="history-empty">Nothing watched yet — tap a service after shuffling to log it here.</div>
+  </div>
+
   <footer>
     Show + streaming-availability data via TMDB. Availability reflects TMDB's own watch-provider data (sourced from JustWatch) and may not always be complete or current.<br/>
     The countdown timer is based on the show's average runtime, not real playback — this app can't see what happens inside another site's video player.
   </footer>
 </div>
+
 <script>
 (function () {
   const TMDB_BASE = 'https://api.themoviedb.org/3';
@@ -258,12 +309,18 @@
   let apiKey = 'fdb3cf1ab625cec36dc770dea7658560';
   let list = [];
   let region = 'US';
+  let history = [];
+
+  // Timer state
   let timerInterval = null;
   let remainingSeconds = 0;
   let totalSeconds = 0;
   let isPaused = false;
   let hasStartedThisRound = false;
+
   const el = (id) => document.getElementById(id);
+
+  // ---------- Persistence ----------
   async function loadPersisted() {
     try {
       const raw = localStorage.getItem('cartoon-shuffler-list');
@@ -272,6 +329,14 @@
     try {
       region = localStorage.getItem('cartoon-shuffler-region') || 'US';
     } catch (e) { region = 'US'; }
+    try {
+      const raw = localStorage.getItem('cartoon-shuffler-history');
+      history = raw ? JSON.parse(raw) : [];
+    } catch (e) { history = []; }
+  }
+  async function saveHistory() {
+    try { localStorage.setItem('cartoon-shuffler-history', JSON.stringify(history)); }
+    catch (e) { console.error('Failed to save history', e); }
   }
   async function saveList() {
     try { localStorage.setItem('cartoon-shuffler-list', JSON.stringify(list)); }
@@ -281,6 +346,8 @@
     try { localStorage.setItem('cartoon-shuffler-region', region); }
     catch (e) { console.error('Failed to save region', e); }
   }
+
+  // ---------- Per-service link builder ----------
   const PROVIDER_LINK_RULES = [
     { match: /paramount/i, build: (t) => `https://www.paramountplus.com/search/?query=${encodeURIComponent(t)}` },
     { match: /disney/i, build: (t) => `https://www.disneyplus.com/search?q=${encodeURIComponent(t)}` },
@@ -300,6 +367,8 @@
     if (rule) return rule.build(showTitle);
     return `https://www.google.com/search?q=${encodeURIComponent('watch ' + showTitle + ' on ' + providerName)}`;
   }
+
+  // ---------- TMDB calls ----------
   async function tmdbFetch(path, params) {
     const url = new URL(TMDB_BASE + path);
     url.searchParams.set('api_key', apiKey);
@@ -327,18 +396,24 @@
     const forRegion = data.results ? data.results[r] : null;
     return forRegion || null;
   }
+
+  // ---------- Setup ----------
   function renderSetup() {
     el('search-panel').style.display = 'block';
     el('list-panel').style.display = 'block';
     el('shuffle-panel').style.display = 'block';
+    el('history-panel').style.display = 'block';
     el('region-select').value = region;
   }
   el('region-select').addEventListener('change', (e) => {
     region = e.target.value;
     saveRegion();
   });
+
+  // ---------- Search ----------
   el('search-btn').addEventListener('click', doSearch);
   el('search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+
   async function doSearch() {
     const q = el('search-input').value.trim();
     el('search-error').textContent = '';
@@ -351,6 +426,7 @@
       el('search-error').textContent = e.message;
     }
   }
+
   function renderSearchResults(results) {
     const container = el('search-results');
     container.innerHTML = '';
@@ -377,6 +453,7 @@
       btn.addEventListener('click', () => addShow(parseInt(btn.getAttribute('data-add'), 10), results));
     });
   }
+
   async function addShow(tmdbId, resultsPool) {
     if (list.some((s) => s.tmdbId === tmdbId)) return;
     const found = resultsPool.find((r) => r.id === tmdbId);
@@ -388,7 +465,8 @@
       if (details.episode_run_time && details.episode_run_time.length) {
         avgRuntimeMin = details.episode_run_time[0];
       }
-    } catch (e) { }
+    } catch (e) { /* fall back to defaults */ }
+
     list.push({
       tmdbId,
       title: found ? found.name : 'Unknown show',
@@ -400,11 +478,14 @@
     renderList();
     doSearch();
   }
+
   async function removeShow(tmdbId) {
     list = list.filter((s) => s.tmdbId !== tmdbId);
     await saveList();
     renderList();
   }
+
+  // ---------- List rendering ----------
   function renderList() {
     el('list-count').textContent = list.length;
     const container = el('list-items');
@@ -426,7 +507,44 @@
       btn.addEventListener('click', () => removeShow(parseInt(btn.getAttribute('data-remove'), 10)));
     });
   }
+
+  // ---------- History ----------
+  async function addToHistory(show, episode) {
+    history.unshift({
+      title: show.title,
+      season: episode.season_number,
+      episode: episode.episode_number,
+      epTitle: episode.name || '',
+    });
+    history = history.slice(0, 10);
+    await saveHistory();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const container = el('history-list');
+    container.innerHTML = '';
+    el('history-empty').style.display = history.length === 0 ? 'block' : 'none';
+    container.style.display = history.length === 0 ? 'none' : 'flex';
+    history.forEach((h) => {
+      const row = document.createElement('div');
+      row.className = 'history-item';
+      row.innerHTML =
+        '<span class="h-title">' + escapeHtml(h.title) + '</span>' +
+        '<span class="h-ep">S' + h.season + 'E' + h.episode + (h.epTitle ? ' · ' + escapeHtml(h.epTitle) : '') + '</span>';
+      container.appendChild(row);
+    });
+  }
+
+  el('clear-history-btn').addEventListener('click', async () => {
+    history = [];
+    await saveHistory();
+    renderHistory();
+  });
+
+  // ---------- Shuffle / Now Playing ----------
   el('shuffle-btn').addEventListener('click', () => { resetTimer(); doShuffle(); });
+
   async function doShuffle() {
     el('shuffle-error').textContent = '';
     if (list.length === 0) {
@@ -436,6 +554,7 @@
     const btn = el('shuffle-btn');
     btn.disabled = true;
     el('np-content').innerHTML = '<div class="np-placeholder">📼 tuning in…</div>';
+
     try {
       const show = list[Math.floor(Math.random() * list.length)];
       const seasonNumber = 1 + Math.floor(Math.random() * show.numberOfSeasons);
@@ -452,8 +571,10 @@
       btn.disabled = false;
     }
   }
+
   function renderNowPlaying(show, episode, providers, isUpNext) {
     const flatrate = providers && providers.flatrate ? providers.flatrate : [];
+
     let providerHtml = '';
     if (flatrate.length) {
       providerHtml = '<div class="providers">' +
@@ -465,21 +586,28 @@
     } else {
       providerHtml = '<div class="providers"><span class="provider-tag dim">No streaming match found for ' + region + '</span></div>';
     }
+
     const banner = isUpNext ? '<div class="up-next-banner">▶ Up next — tap a service below to keep going</div>' : '';
     const hint = flatrate.length ? '<div class="np-hint">Tap a service to watch — your countdown starts then.</div>' : '';
+
     el('np-content').innerHTML =
       banner +
       '<div class="np-show-title">' + escapeHtml(show.title) + '</div>' +
       '<div class="np-ep-line">S' + episode.season_number + 'E' + episode.episode_number + ' · ' + escapeHtml(episode.name || '') + '</div>' +
       hint +
       providerHtml;
+
+    // Every provider tap starts the countdown for THIS episode's runtime.
     document.querySelectorAll('#np-content .provider-tag[data-runtime]').forEach((tagEl) => {
       tagEl.addEventListener('click', () => {
         const mins = parseInt(tagEl.getAttribute('data-runtime'), 10) || 22;
         startTimer(mins);
+        addToHistory(show, episode);
       });
     });
   }
+
+  // ---------- Countdown timer ----------
   function startTimer(minutes) {
     resetTimer();
     hasStartedThisRound = true;
@@ -491,6 +619,7 @@
     tickTimer();
     timerInterval = setInterval(tickTimer, 1000);
   }
+
   function tickTimer() {
     if (isPaused) return;
     remainingSeconds -= 1;
@@ -501,6 +630,7 @@
       onTimerFinished();
     }
   }
+
   function updateTimerUI() {
     const mm = Math.floor(Math.max(remainingSeconds, 0) / 60).toString().padStart(2, '0');
     const ss = Math.max(remainingSeconds, 0) % 60;
@@ -509,13 +639,16 @@
     el('progress-fill').style.width = pct + '%';
     el('timer-status').textContent = isPaused ? '(paused)' : '';
   }
+
   el('pause-btn').addEventListener('click', () => {
-    if (!timerInterval && !isPaused) return;
+    if (!timerInterval && !isPaused) return; // nothing running
     isPaused = !isPaused;
     el('pause-btn').textContent = isPaused ? '▶ Resume' : '⏸ Pause';
     updateTimerUI();
   });
+
   el('cancel-timer-btn').addEventListener('click', () => { resetTimer(); });
+
   function resetTimer() {
     if (timerInterval) clearInterval(timerInterval);
     timerInterval = null;
@@ -526,6 +659,7 @@
     el('timer-box').style.display = 'none';
     el('progress-fill').style.width = '0%';
   }
+
   async function onTimerFinished() {
     el('timer-box').style.display = 'none';
     if (list.length === 0) return;
@@ -541,15 +675,18 @@
       el('np-content').innerHTML = '<div class="np-placeholder">— no signal —</div>';
     }
   }
+
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str == null ? '' : String(str);
     return div.innerHTML;
   }
+
   (async function init() {
     await loadPersisted();
     renderSetup();
     renderList();
+    renderHistory();
   })();
 })();
 </script>
