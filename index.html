@@ -188,6 +188,19 @@
   .provider-tag:hover { transform: translateY(-1px); border-color: var(--accent); }
   .provider-tag.dim { background: transparent; color: var(--text-dim); }
 
+  .yt-slot { margin-bottom: 12px; }
+  .yt-play-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #c4302b; color: #fff; border: none; border-radius: 12px;
+    padding: 11px 20px; font-family: 'Sora', sans-serif; font-weight: 800; font-size: 0.92rem;
+    cursor: pointer; transition: transform 0.1s ease, box-shadow 0.1s ease;
+  }
+  .yt-play-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(196,48,43,0.4); }
+  .yt-player-wrap { width: 100%; margin-bottom: 14px; }
+  .yt-frame-box { position: relative; width: 100%; aspect-ratio: 16 / 9; }
+  .yt-frame-box iframe { width: 100%; height: 100%; border: 0; border-radius: 12px; background: #000; }
+  .yt-stop-row { margin-top: 8px; text-align: right; }
+
   .timer-box { padding: 16px 20px 20px; border-top: 1px solid var(--border); }
   .timer-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
   .timer-clock { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.1rem; color: var(--gold); }
@@ -387,6 +400,13 @@
   const TMDB_BASE = 'https://api.themoviedb.org/3';
   const IMG_BASE = 'https://image.tmdb.org/t/p/w300';
   let apiKey = 'fdb3cf1ab625cec36dc770dea7658560';
+
+  // ▼▼▼ YOUTUBE SETUP — paste your YouTube API key between the quotes below ▼▼▼
+  // Without a key, the app works exactly as before (streaming buttons only).
+  // With a key, episodes that exist on YouTube get a "Play on this website" button.
+  const YT_API_KEY = '';
+  // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
+
   let list = [];
   let region = 'US';
   let history = [];
@@ -657,6 +677,118 @@
     renderHistory();
   });
 
+  // ---------- YouTube full-episode lookup ----------
+  const WEBSITE_PROVIDER = '▶ This website';
+  const ytCache = {}; // "tmdbId-s-e" -> { videoId, title } | null
+
+  function isoDurationMinutes(iso) {
+    if (!iso) return 0;
+    const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!m) return 0;
+    return (parseInt(m[1] || 0, 10) * 60) + parseInt(m[2] || 0, 10) + (parseInt(m[3] || 0, 10) / 60);
+  }
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  async function findYouTubeEpisode(show, episode) {
+    if (!YT_API_KEY) return null;
+    const cacheKey = show.tmdbId + '-' + episode.season_number + '-' + episode.episode_number;
+    if (cacheKey in ytCache) return ytCache[cacheKey];
+    try {
+      const q = show.title + ' season ' + episode.season_number + ' episode ' + episode.episode_number + ' full episode';
+      const sRes = await fetch(
+        'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&safeSearch=moderate&maxResults=8' +
+        '&q=' + encodeURIComponent(q) + '&key=' + YT_API_KEY
+      );
+      if (!sRes.ok) throw new Error('YouTube search HTTP ' + sRes.status);
+      const sData = await sRes.json();
+      const ids = (sData.items || []).map((i) => i.id && i.id.videoId).filter(Boolean);
+      if (!ids.length) { ytCache[cacheKey] = null; return null; }
+
+      const vRes = await fetch(
+        'https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=' + ids.join(',') + '&key=' + YT_API_KEY
+      );
+      if (!vRes.ok) throw new Error('YouTube videos HTTP ' + vRes.status);
+      const vData = await vRes.json();
+
+      const runtime = show.avgRuntimeMin || 22;
+      const s = episode.season_number, e = episode.episode_number;
+      const epName = (episode.name || '').toLowerCase();
+      const showStart = show.title.toLowerCase().slice(0, 12);
+      let best = null, bestScore = 0;
+
+      (vData.items || []).forEach((v) => {
+        if (v.status && v.status.embeddable === false) return;
+        const mins = isoDurationMinutes(v.contentDetails && v.contentDetails.duration);
+        // Must be roughly episode-length: not a clip, not a 3-hour compilation.
+        if (!mins || mins < runtime * 0.6 || mins > runtime * 2.2) return;
+        const title = ((v.snippet && v.snippet.title) || '').toLowerCase();
+        let score = 0;
+        const sxe = ['s' + pad2(s) + 'e' + pad2(e), 's' + s + 'e' + e, s + 'x' + pad2(e), 'season ' + s + ' episode ' + e, 'season ' + s + ', episode ' + e];
+        if (sxe.some((p) => title.indexOf(p) !== -1)) score += 3;
+        if (title.indexOf('full episode') !== -1 || title.indexOf('full ep') !== -1) score += 2;
+        if (epName && epName.length > 3 && title.indexOf(epName) !== -1) score += 3;
+        if (title.indexOf(showStart) !== -1) score += 1;
+        if (score > bestScore) { bestScore = score; best = v; }
+      });
+
+      // Need real evidence it's THIS episode, not just any video of the show.
+      const result = (best && bestScore >= 3)
+        ? { videoId: best.id, title: best.snippet ? best.snippet.title : '' }
+        : null;
+      ytCache[cacheKey] = result;
+      return result;
+    } catch (err) {
+      console.warn('YouTube lookup skipped:', err);
+      return null; // don't cache errors — quota may reset
+    }
+  }
+
+  // Insert the embedded player at the top of the now-playing box. DOM only —
+  // timer/history are handled by the callers.
+  function embedPlayer(show, episode, videoId) {
+    const np = el('np-content');
+    const old = np.querySelector('.yt-player-wrap');
+    if (old) old.remove();
+    const wrap = document.createElement('div');
+    wrap.className = 'yt-player-wrap';
+    wrap.innerHTML =
+      '<div class="yt-frame-box"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(videoId) +
+      '?autoplay=1&rel=0" title="YouTube player" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>' +
+      '<div class="yt-stop-row"><button class="btn btn-ghost btn-small" id="yt-stop-btn">✕ Stop watching</button></div>';
+    np.insertBefore(wrap, np.firstChild);
+    wrap.querySelector('#yt-stop-btn').addEventListener('click', () => {
+      wrap.remove();
+      const slot = el('yt-slot');
+      if (slot) renderYtButton(slot, show, episode, videoId);
+    });
+    const slot = el('yt-slot');
+    if (slot) slot.innerHTML = '';
+  }
+
+  function renderYtButton(slot, show, episode, videoId) {
+    slot.innerHTML = '<button class="yt-play-btn">▶ Play on this website</button>';
+    slot.querySelector('.yt-play-btn').addEventListener('click', () => {
+      embedPlayer(show, episode, videoId);
+      lastProviderName = WEBSITE_PROVIDER;
+      saveLastProvider();
+      startTimer(show.avgRuntimeMin || 22);
+      addToHistory(show, episode);
+      recordWatch(show.tmdbId);
+    });
+  }
+
+  async function attachYouTubeOption(show, episode) {
+    const slot = el('yt-slot');
+    if (!slot || !YT_API_KEY) return;
+    slot.innerHTML = '<span class="np-hint">🔎 checking YouTube…</span>';
+    const found = await findYouTubeEpisode(show, episode);
+    const current = el('yt-slot');
+    if (!current || current !== slot) return; // a new shuffle replaced this card
+    if (!found) { slot.innerHTML = ''; return; }
+    if (el('np-content').querySelector('.yt-player-wrap')) { slot.innerHTML = ''; return; } // already playing
+    renderYtButton(slot, show, episode, found.videoId);
+  }
+
   // ---------- Shuffle / Now Playing ----------
   el('shuffle-btn').addEventListener('click', () => { resetTimer(); doShuffle(); });
 
@@ -710,7 +842,11 @@
       '<div class="np-show-title">' + escapeHtml(show.title) + '</div>' +
       '<div class="np-ep-line">S' + episode.season_number + 'E' + episode.episode_number + ' · ' + escapeHtml(episode.name || '') + '</div>' +
       hint +
+      '<div class="yt-slot" id="yt-slot"></div>' +
       providerHtml;
+
+    // If this episode exists on YouTube, offer to play it right here.
+    attachYouTubeOption(show, episode);
 
     // Every provider tap starts the countdown for THIS episode's runtime.
     document.querySelectorAll('#np-content .provider-tag[data-runtime]').forEach((tagEl) => {
@@ -805,25 +941,39 @@
       renderNowPlaying(show, episode, providers, true);
 
       if (autoplay) {
-        // Start the next countdown automatically and try to open the same service.
+        // Start the next countdown automatically.
         startTimer(show.avgRuntimeMin || 22);
         addToHistory(show, episode);
         recordWatch(show.tmdbId);
 
-        const flatrate = providers && providers.flatrate ? providers.flatrate : [];
-        let pick = null;
-        if (lastProviderName) {
-          pick = flatrate.find((p) => p.provider_name === lastProviderName) || null;
+        // If they were watching right here, try to keep it here.
+        let playedOnSite = false;
+        if (lastProviderName === WEBSITE_PROVIDER) {
+          const found = await findYouTubeEpisode(show, episode);
+          if (found) {
+            embedPlayer(show, episode, found.videoId);
+            playedOnSite = true;
+            const banner = document.querySelector('#np-content .up-next-banner');
+            if (banner) banner.innerHTML = '▶ Autoplay — playing right here, countdown running';
+          }
         }
-        if (!pick && flatrate.length) pick = flatrate[0];
-        if (pick) {
-          const url = buildProviderLink(pick.provider_name, show.title);
-          const win = window.open(url, '_blank');
-          const banner = document.querySelector('#np-content .up-next-banner');
-          if (banner) {
-            banner.innerHTML = win
-              ? '▶ Autoplay — opened <strong>' + escapeHtml(pick.provider_name) + '</strong> in a new tab, countdown running'
-              : '▶ Autoplay — countdown running. Your browser blocked the new tab, so tap <strong>' + escapeHtml(pick.provider_name) + '</strong> below to open it.';
+
+        if (!playedOnSite) {
+          const flatrate = providers && providers.flatrate ? providers.flatrate : [];
+          let pick = null;
+          if (lastProviderName && lastProviderName !== WEBSITE_PROVIDER) {
+            pick = flatrate.find((p) => p.provider_name === lastProviderName) || null;
+          }
+          if (!pick && flatrate.length) pick = flatrate[0];
+          if (pick) {
+            const url = buildProviderLink(pick.provider_name, show.title);
+            const win = window.open(url, '_blank');
+            const banner = document.querySelector('#np-content .up-next-banner');
+            if (banner) {
+              banner.innerHTML = win
+                ? '▶ Autoplay — opened <strong>' + escapeHtml(pick.provider_name) + '</strong> in a new tab, countdown running'
+                : '▶ Autoplay — countdown running. Your browser blocked the new tab, so tap <strong>' + escapeHtml(pick.provider_name) + '</strong> below to open it.';
+            }
           }
         }
       }
