@@ -288,6 +288,9 @@
     <h1>📺 Show Shuffler</h1>
     <p>Add shows you can watch, hit shuffle, land on a random episode.</p>
     <p id="greeting" style="display:none; color: var(--teal); font-weight:600; font-size:0.85rem; margin-top:4px;"></p>
+    <p id="account-tools" style="display:none; margin-top:6px;">
+      <button class="btn btn-ghost btn-small" id="transfer-btn">📤 Move / back up my account</button>
+    </p>
   </header>
 
   <div class="panel" id="search-panel" style="display:none;">
@@ -363,6 +366,7 @@
   <footer>
     Show + streaming-availability data via TMDB. Availability reflects TMDB's own watch-provider data (sourced from JustWatch) and may not always be complete or current.<br/>
     The countdown timer is based on the show's average runtime, not real playback — this app can't see what happens inside another site's video player.
+    <span id="footer-restore" style="display:none;"><br/><a href="#" id="footer-restore-link" style="color: var(--teal);">Have an account on another device? Log in with your transfer code or backup email →</a></span>
   </footer>
 </div>
 
@@ -894,8 +898,12 @@
     if (account && account.name) {
       g.textContent = '👋 Welcome back, ' + account.name;
       g.style.display = 'block';
+      el('account-tools').style.display = 'block';
+      el('footer-restore').style.display = 'none';
     } else {
       g.style.display = 'none';
+      el('account-tools').style.display = 'none';
+      el('footer-restore').style.display = 'inline';
     }
   }
   function showAccountBubble() {
@@ -905,10 +913,12 @@
       'Create a free account to save your list of shows — or just keep browsing.' +
       '<div class="bubble-actions">' +
         '<button class="btn btn-small" id="bubble-create-btn">Create free account</button>' +
+        '<button class="btn btn-ghost btn-small" id="bubble-restore-btn">I already have an account</button>' +
         '<button class="btn btn-ghost btn-small" id="bubble-later-btn">Keep browsing</button>' +
       '</div>';
     el('account-bubble').style.display = 'block';
     el('bubble-create-btn').addEventListener('click', showAccountForm);
+    el('bubble-restore-btn').addEventListener('click', showRestoreDialog);
     el('bubble-later-btn').addEventListener('click', dismissBubble);
   }
   function showAccountForm() {
@@ -929,7 +939,7 @@
       renderGreeting();
       el('bubble-inner').innerHTML =
         '<div class="bubble-title">You\'re all set, ' + escapeHtml(name) + '! 🎉</div>' +
-        'Your shuffle list is saved and you\'ll be remembered automatically on this device.';
+        'Your shuffle list is saved and you\'ll be remembered automatically on this device. Tap "Move / back up my account" under your name anytime to email yourself a backup or move to another device.';
       setTimeout(() => { el('account-bubble').style.display = 'none'; }, 3500);
     });
   }
@@ -947,6 +957,193 @@
     return div.innerHTML;
   }
 
+  // ---------- Transfer codes & email backup ----------
+  // SHUF2- codes are deflate-compressed (much shorter, email-friendly).
+  // SHUF1- codes are plain base64 — used only on very old browsers, and
+  // both kinds can always be read back on any device.
+  const PLAIN_PREFIX = 'SHUF1-';
+  const ZIP_PREFIX = 'SHUF2-';
+  const canZip = typeof CompressionStream !== 'undefined' && typeof DecompressionStream !== 'undefined';
+
+  function toB64Url(bin) {
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function fromB64Url(str) {
+    let b64 = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    return atob(b64);
+  }
+
+  async function buildBackupCode() {
+    const payload = {
+      v: 1,
+      account,
+      list,
+      history: history.slice(0, 10),
+      region,
+      autoplay,
+    };
+    const json = JSON.stringify(payload);
+    if (canZip) {
+      try {
+        const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('deflate'));
+        const buf = await new Response(stream).arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let bin = '';
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return ZIP_PREFIX + toB64Url(bin);
+      } catch (e) { /* fall through to plain */ }
+    }
+    // UTF-8-safe plain base64 fallback
+    return PLAIN_PREFIX + toB64Url(unescape(encodeURIComponent(json)));
+  }
+
+  async function parseBackupCode(input) {
+    if (!input) return null;
+    let str = String(input).trim();
+    // Accept a full backup link too — pull out the code after #restore=
+    const m = str.match(/#restore=([^&\s]+)/);
+    if (m) str = m[1];
+    try { str = decodeURIComponent(str); } catch (e) { /* leave as-is */ }
+    str = str.replace(/\s+/g, '');
+    let zipped = false;
+    if (str.indexOf(ZIP_PREFIX) === 0) { zipped = true; str = str.slice(ZIP_PREFIX.length); }
+    else if (str.indexOf(PLAIN_PREFIX) === 0) { str = str.slice(PLAIN_PREFIX.length); }
+    if (!str) return null;
+    try {
+      const bin = fromB64Url(str);
+      let json;
+      if (zipped) {
+        if (!canZip) return null;
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate'));
+        json = await new Response(stream).text();
+      } else {
+        json = decodeURIComponent(escape(bin));
+      }
+      const payload = JSON.parse(json);
+      if (!payload || payload.v !== 1 || !payload.account || !payload.account.name) return null;
+      return payload;
+    } catch (e) { return null; }
+  }
+
+  async function applyBackup(payload) {
+    account = payload.account;
+    list = Array.isArray(payload.list) ? payload.list : [];
+    history = Array.isArray(payload.history) ? payload.history.slice(0, 10) : [];
+    region = payload.region || 'US';
+    autoplay = payload.autoplay === true;
+    saveAccount();
+    await saveList();
+    await saveHistory();
+    await saveRegion();
+    saveAutoplay();
+    bubbleDismissed = true; // no need to nudge someone who just logged in
+    saveBubbleState();
+    renderList();
+    renderHistory();
+    renderGreeting();
+    const rs = el('region-select');
+    if (rs) rs.value = region;
+    const at = el('autoplay-toggle');
+    if (at) at.checked = autoplay;
+  }
+
+  function backupLink(code) {
+    return location.origin + location.pathname + '#restore=' + code;
+  }
+
+  function copyText(text, btn, doneLabel) {
+    const finish = () => {
+      const old = btn.textContent;
+      btn.textContent = doneLabel;
+      setTimeout(() => { btn.textContent = old; }, 2000);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(finish).catch(finish);
+    } else { finish(); }
+  }
+
+  async function showTransferDialog() {
+    if (!account) return;
+    const code = await buildBackupCode();
+    const link = backupLink(code);
+    el('bubble-inner').innerHTML =
+      '<div class="bubble-title">Move or back up your account 📤</div>' +
+      'This code holds your account, show list, and history.' +
+      '<textarea id="transfer-code-box" readonly rows="4" style="width:100%; margin-top:8px; font-family: \'JetBrains Mono\', monospace; font-size:0.68rem; background: var(--bg-elev-2); color: var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; resize:none;"></textarea>' +
+      '<div class="bubble-actions">' +
+        '<button class="btn btn-small" id="copy-code-btn">📋 Copy code</button>' +
+        '<button class="btn btn-small" id="email-backup-btn">✉️ Email myself a backup</button>' +
+        '<button class="btn btn-ghost btn-small" id="copy-link-btn">🔗 Copy backup link</button>' +
+      '</div>' +
+      '<div class="bubble-fineprint">On your other device: open this site, tap the log-in link at the bottom, and paste the code. The email backup works the same way later — open it on any device and tap the link. The backup holds your account as of today, so re-send it after you\'ve added new shows.</div>';
+    el('account-bubble').style.display = 'block';
+    el('transfer-code-box').value = code;
+    el('transfer-code-box').addEventListener('focus', function () { this.select(); });
+    el('copy-code-btn').addEventListener('click', () => copyText(code, el('copy-code-btn'), '✅ Copied!'));
+    el('copy-link-btn').addEventListener('click', () => copyText(link, el('copy-link-btn'), '✅ Copied!'));
+    el('email-backup-btn').addEventListener('click', () => {
+      const to = account.email ? encodeURIComponent(account.email) : '';
+      const subject = encodeURIComponent('My Show Shuffler backup');
+      const body = encodeURIComponent(
+        'Keep this email! Open it on any device and tap the link below to log back in to Show Shuffler with all your shows.\n\n' +
+        link +
+        '\n\nIf the link doesn\'t open, copy this code and paste it into the "log in" box on the site instead:\n\n' +
+        code
+      );
+      location.href = 'mailto:' + to + '?subject=' + subject + '&body=' + body;
+    });
+  }
+
+  function showRestoreDialog() {
+    el('bubble-inner').innerHTML =
+      '<div class="bubble-title">Log in with a code 🔑</div>' +
+      'Paste the transfer code from your other device, or the link from your backup email.' +
+      '<textarea id="restore-code-box" rows="4" placeholder="SHUF1-…" style="width:100%; margin-top:8px; font-family: \'JetBrains Mono\', monospace; font-size:0.68rem; background: var(--bg-elev-2); color: var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; resize:none;"></textarea>' +
+      '<div class="error-msg" id="restore-error" style="display:none; margin-top:6px;">That code doesn\'t look right — make sure you copied the whole thing.</div>' +
+      '<div class="bubble-actions">' +
+        '<button class="btn btn-small" id="restore-go-btn">Log me in</button>' +
+      '</div>';
+    el('account-bubble').style.display = 'block';
+    el('restore-code-box').focus();
+    el('restore-go-btn').addEventListener('click', async () => {
+      const payload = await parseBackupCode(el('restore-code-box').value);
+      if (!payload) { el('restore-error').style.display = 'block'; return; }
+      await applyBackup(payload);
+      el('bubble-inner').innerHTML =
+        '<div class="bubble-title">Welcome back, ' + escapeHtml(account.name) + '! 🎉</div>' +
+        'Your shows and history are back on this device.';
+      setTimeout(() => { el('account-bubble').style.display = 'none'; }, 3500);
+    });
+  }
+
+  async function maybeRestoreFromLink() {
+    if (!location.hash || location.hash.indexOf('#restore=') !== 0) return;
+    const payload = await parseBackupCode(location.hash);
+    // Clear the hash either way so the code doesn't linger in the address bar
+    try { historyReplace(); } catch (e) {}
+    if (!payload) return;
+    if (account && account.name && account.name !== payload.account.name) {
+      const ok = confirm('Log in as ' + payload.account.name + '? This will replace ' + account.name + '\'s account on this device.');
+      if (!ok) return;
+    }
+    await applyBackup(payload);
+    el('bubble-inner').innerHTML =
+      '<div class="bubble-title">Welcome back, ' + escapeHtml(account.name) + '! 🎉</div>' +
+      'Your shows and history are back on this device.';
+    el('account-bubble').style.display = 'block';
+    setTimeout(() => { el('account-bubble').style.display = 'none'; }, 3500);
+  }
+
+  function historyReplace() {
+    window.history.replaceState(null, '', location.pathname + location.search);
+  }
+
+  el('transfer-btn').addEventListener('click', showTransferDialog);
+  el('footer-restore-link').addEventListener('click', (e) => { e.preventDefault(); showRestoreDialog(); });
+
   (async function init() {
     await loadPersisted();
     renderSetup();
@@ -955,6 +1152,8 @@
     renderVerse();
     renderGreeting();
     el('autoplay-toggle').checked = autoplay;
+    // If they arrived via a backup-email link, log them straight in.
+    await maybeRestoreFromLink();
     // First visit (no account, never dismissed): show the nudge after a moment.
     if (!account && !bubbleDismissed) {
       setTimeout(showAccountBubble, 2500);
