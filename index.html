@@ -201,6 +201,21 @@
   .yt-frame-box iframe { width: 100%; height: 100%; border: 0; border-radius: 12px; background: #000; }
   .yt-stop-row { margin-top: 8px; text-align: right; }
 
+  .theater-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(8, 8, 14, 0.97);
+    display: flex; flex-direction: column;
+  }
+  .theater-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; }
+  .theater-title {
+    font-family: 'Sora', sans-serif; font-weight: 700; font-size: 0.95rem; color: var(--gold);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .theater-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 12px 12px; min-height: 0; }
+  .theater-stage .frame { width: 100%; max-width: 1100px; aspect-ratio: 16 / 9; max-height: 100%; }
+  .theater-stage .frame iframe, .theater-stage .frame > div { width: 100%; height: 100%; border: 0; border-radius: 12px; background: #000; }
+  .theater-hint { text-align: center; color: var(--text-dim); font-size: 0.75rem; padding-bottom: 12px; }
+
   .timer-box { padding: 16px 20px 20px; border-top: 1px solid var(--border); }
   .timer-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
   .timer-clock { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.1rem; color: var(--gold); }
@@ -452,6 +467,8 @@
       recent: (p && Array.isArray(p.recent)) ? p.recent.slice(-25) : [],
       // null = not configured yet; array = only these services get the portal
       services: (p && Array.isArray(p.services)) ? p.services : null,
+      // unfinished on-site episode to offer "continue watching"
+      resume: (p && p.resume && typeof p.resume === 'object') ? p.resume : null,
     };
   }
 
@@ -841,37 +858,221 @@
     }
   }
 
-  // Insert the embedded player at the top of the now-playing box. DOM only —
-  // timer/history are handled by the callers.
-  function embedPlayer(show, episode, videoId) {
-    const np = el('np-content');
-    const old = np.querySelector('.yt-player-wrap');
-    if (old) old.remove();
-    const wrap = document.createElement('div');
-    wrap.className = 'yt-player-wrap';
-    wrap.innerHTML =
-      '<div class="yt-frame-box"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(videoId) +
-      '?autoplay=1&rel=0" title="YouTube player" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>' +
-      '<div class="yt-stop-row"><button class="btn btn-ghost btn-small" id="yt-stop-btn">✕ Stop watching</button></div>';
-    np.insertBefore(wrap, np.firstChild);
-    wrap.querySelector('#yt-stop-btn').addEventListener('click', () => {
-      wrap.remove();
-      const slot = el('yt-slot');
-      if (slot) renderYtButton(slot, show, episode, videoId);
+  // ---------- Theater playback (YouTube IFrame API) ----------
+  // Real end-of-episode detection, zero-click chaining, and resume support.
+  let theaterPlayer = null;
+  let theaterState = null;      // { show, episode, videoId }
+  let theaterInterval = null;   // saves resume position while playing
+  let pendingNext = null;       // pre-loaded next episode { show, episode, videoId|null }
+  let ytApiPromise = null;
+
+  function loadYTApi() {
+    if (window.YT && window.YT.Player) return Promise.resolve();
+    if (ytApiPromise) return ytApiPromise;
+    ytApiPromise = new Promise((resolve, reject) => {
+      const t = setTimeout(() => { ytApiPromise = null; reject(new Error('YT API timeout')); }, 6000);
+      window.onYouTubeIframeAPIReady = () => { clearTimeout(t); resolve(); };
+      const sc = document.createElement('script');
+      sc.src = 'https://www.youtube.com/iframe_api';
+      sc.onerror = () => { clearTimeout(t); ytApiPromise = null; reject(new Error('YT API load failed')); };
+      document.head.appendChild(sc);
     });
-    const slot = el('yt-slot');
-    if (slot) slot.innerHTML = '';
+    return ytApiPromise;
+  }
+
+  // The one entry point for playing an episode on the site. Logs history,
+  // remembers the "provider", and opens the theater.
+  function startSitePlayback(show, episode, videoId) {
+    cancelPortal();
+    lastProviderName = WEBSITE_PROVIDER;
+    saveLastProvider();
+    addToHistory(show, episode);
+    recordWatch(show.tmdbId);
+    openTheater(show, episode, videoId, null);
+  }
+
+  function theaterTitleText(show, episode) {
+    return show.title + ' · S' + episode.season_number + 'E' + episode.episode_number +
+      (episode.name ? ' · ' + episode.name : '');
+  }
+
+  async function openTheater(show, episode, videoId, startSeconds) {
+    closeTheater(false); // replace any existing session
+    resetTimer();        // real end detection replaces the estimate
+
+    // Auto-resume if this exact episode was left unfinished.
+    let startAt = startSeconds || 0;
+    const key = epKey(show.tmdbId, episode.season_number, episode.episode_number);
+    if (!startAt && account && account.resume && account.resume.key === key && account.resume.t > 30) {
+      startAt = Math.floor(account.resume.t);
+    }
+
+    const root = document.createElement('div');
+    root.className = 'theater-overlay';
+    root.id = 'theater-root';
+    root.innerHTML =
+      '<div class="theater-top">' +
+        '<span class="theater-title" id="theater-title">' + escapeHtml(theaterTitleText(show, episode)) + '</span>' +
+        '<span style="display:flex; gap:8px; flex:0 0 auto;">' +
+          (startAt > 0 ? '<button class="btn btn-ghost btn-small" id="theater-restart">↺ Start over</button>' : '') +
+          '<button class="btn btn-ghost btn-small" id="theater-stop">✕ Stop watching</button>' +
+        '</span>' +
+      '</div>' +
+      '<div class="theater-stage"><div class="frame"><div id="yt-player-host"></div></div></div>' +
+      '<div class="theater-hint" id="theater-hint">' +
+        (autoplay ? 'Next episode starts automatically when this one ends ✨' : 'Tap ✕ Stop watching when you\'re done') +
+      '</div>';
+    document.body.appendChild(root);
+    theaterState = { show, episode, videoId };
+    root.querySelector('#theater-stop').addEventListener('click', () => closeTheater(true));
+    const restart = root.querySelector('#theater-restart');
+    if (restart) restart.addEventListener('click', () => {
+      if (theaterPlayer && theaterPlayer.seekTo) theaterPlayer.seekTo(0, true);
+      restart.remove();
+    });
+
+    try {
+      await loadYTApi();
+      if (!document.getElementById('theater-root')) return; // closed while loading
+      theaterPlayer = new YT.Player('yt-player-host', {
+        videoId: videoId,
+        playerVars: { autoplay: 1, rel: 0, playsinline: 1, start: startAt },
+        events: {
+          onReady: (ev) => { try { ev.target.playVideo(); } catch (e) {} },
+          onStateChange: (ev) => { if (ev.data === 0) onEpisodeEnded(); }, // 0 = ended
+          onError: () => { if (autoplay) advanceOnSite(); else setHint('This video wouldn\'t play — tap ✕ and try another shuffle.'); },
+        },
+      });
+      // Save the resume position every 5 seconds while watching.
+      theaterInterval = setInterval(captureResume, 5000);
+      // Quietly line up the next episode while this one plays.
+      preloadNext();
+    } catch (e) {
+      // IFrame API blocked — fall back to a plain embed + the runtime countdown.
+      console.warn('YT API unavailable, using basic embed:', e);
+      const host = document.getElementById('yt-player-host');
+      if (host) {
+        host.innerHTML = '<iframe src="https://www.youtube.com/embed/' + encodeURIComponent(videoId) +
+          '?autoplay=1&rel=0&playsinline=1' + (startAt ? '&start=' + startAt : '') +
+          '" title="YouTube player" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen style="width:100%; height:100%; border:0; border-radius:12px;"></iframe>';
+      }
+      startTimer(show.avgRuntimeMin || 22); // estimate-based autoplay still works
+    }
+  }
+
+  function setHint(text) {
+    const h = document.getElementById('theater-hint');
+    if (h) h.textContent = text;
+  }
+
+  function captureResume() {
+    if (!theaterPlayer || !theaterState || !account) return;
+    try {
+      const t = theaterPlayer.getCurrentTime ? theaterPlayer.getCurrentTime() : 0;
+      const d = theaterPlayer.getDuration ? theaterPlayer.getDuration() : 0;
+      const s = theaterState;
+      if (t > 30 && d && (d - t) > 60) {
+        account.resume = {
+          key: epKey(s.show.tmdbId, s.episode.season_number, s.episode.episode_number),
+          videoId: s.videoId, t: Math.floor(t), d: Math.floor(d),
+          title: s.show.title, tmdbId: s.show.tmdbId, runtime: s.show.avgRuntimeMin || 22,
+          s: s.episode.season_number, e: s.episode.episode_number, epName: s.episode.name || '',
+          savedAt: Date.now(),
+        };
+        saveProfiles();
+      } else if (d && (d - t) <= 60 && account.resume) {
+        account.resume = null; // basically finished — nothing to resume
+        saveProfiles();
+      }
+    } catch (e) {}
+  }
+
+  function closeTheater(saveProgress) {
+    if (theaterInterval) { clearInterval(theaterInterval); theaterInterval = null; }
+    if (saveProgress) captureResume();
+    if (theaterPlayer) { try { theaterPlayer.destroy(); } catch (e) {} theaterPlayer = null; }
+    const root = document.getElementById('theater-root');
+    if (root) root.remove();
+    pendingNext = null;
+    const s = theaterState;
+    theaterState = null;
+    // Put the play button back on the card, and offer resume if applicable.
+    if (s) { const slot = el('yt-slot'); if (slot) attachYouTubeOption(s.show, s.episode); }
+    renderResumeChip();
+  }
+
+  async function preloadNext() {
+    pendingNext = null;
+    try {
+      const next = await pickFreshEpisode();
+      if (!next || !theaterState) return;
+      const found = await findYouTubeEpisode(next.show, next.episode);
+      if (!theaterState) return; // theater closed meanwhile
+      pendingNext = { show: next.show, episode: next.episode, videoId: found ? found.videoId : null };
+    } catch (e) {}
+  }
+
+  function onEpisodeEnded() {
+    if (account) { account.resume = null; saveProfiles(); }
+    if (autoplay) { advanceOnSite(); return; }
+    setHint('Episode finished ✓');
+    setTimeout(() => { if (theaterState) closeTheater(false); }, 4000);
+  }
+
+  async function advanceOnSite() {
+    let next = pendingNext;
+    pendingNext = null;
+    if (!next) {
+      try {
+        const p = await pickFreshEpisode();
+        if (p) {
+          const f = await findYouTubeEpisode(p.show, p.episode);
+          next = { show: p.show, episode: p.episode, videoId: f ? f.videoId : null };
+        }
+      } catch (e) {}
+    }
+    if (next && next.videoId && theaterPlayer && theaterState) {
+      // Seamless chain: same player, new episode, no clicks.
+      theaterState = { show: next.show, episode: next.episode, videoId: next.videoId };
+      const t = document.getElementById('theater-title');
+      if (t) t.textContent = theaterTitleText(next.show, next.episode);
+      try { theaterPlayer.loadVideoById(next.videoId); } catch (e) { closeTheater(false); return; }
+      addToHistory(next.show, next.episode);
+      recordWatch(next.show.tmdbId);
+      preloadNext();
+    } else {
+      // Next one isn't on YouTube — hand off to the normal card + service flow.
+      closeTheater(false);
+      onTimerFinished();
+    }
+  }
+
+  // Show a "continue watching" button when the profile left an episode unfinished.
+  function renderResumeChip() {
+    const np = el('np-content');
+    if (!np || !np.querySelector('.np-placeholder')) return;
+    const r = account && account.resume;
+    if (!r || !r.videoId) return;
+    const left = Math.max(0, (r.d || 0) - (r.t || 0));
+    if ((r.t || 0) < 30 || left < 60) return;
+    const mins = Math.max(1, Math.round(left / 60));
+    np.innerHTML =
+      '<div class="np-placeholder">— nothing queued up yet —</div>' +
+      '<div style="margin-top:12px;"><button class="yt-play-btn" id="resume-btn">⏯ Continue watching: ' +
+      escapeHtml(r.title) + ' S' + r.s + 'E' + r.e + ' · ' + mins + ' min left</button></div>';
+    el('resume-btn').addEventListener('click', () => {
+      const show = { tmdbId: r.tmdbId, title: r.title, avgRuntimeMin: r.runtime || 22, numberOfSeasons: 1 };
+      const episode = { season_number: r.s, episode_number: r.e, name: r.epName || '' };
+      lastProviderName = WEBSITE_PROVIDER;
+      saveLastProvider();
+      openTheater(show, episode, r.videoId, Math.floor(r.t));
+    });
   }
 
   function renderYtButton(slot, show, episode, videoId) {
     slot.innerHTML = '<button class="yt-play-btn">▶ Play on this website</button>';
     slot.querySelector('.yt-play-btn').addEventListener('click', () => {
-      embedPlayer(show, episode, videoId);
-      lastProviderName = WEBSITE_PROVIDER;
-      saveLastProvider();
-      startTimer(show.avgRuntimeMin || 22);
-      addToHistory(show, episode);
-      recordWatch(show.tmdbId);
+      startSitePlayback(show, episode, videoId);
     });
   }
 
@@ -883,7 +1084,7 @@
     const current = el('yt-slot');
     if (!current || current !== slot) return; // a new shuffle replaced this card
     if (!found) { slot.innerHTML = ''; return; }
-    if (el('np-content').querySelector('.yt-player-wrap')) { slot.innerHTML = ''; return; } // already playing
+    if (document.getElementById('theater-root')) { slot.innerHTML = ''; return; } // already watching
     renderYtButton(slot, show, episode, found.videoId);
   }
 
@@ -1206,24 +1407,23 @@
       renderNowPlaying(show, episode, providers, true);
 
       if (autoplay) {
-        // Start the next countdown automatically.
-        startTimer(show.avgRuntimeMin || 22);
-        addToHistory(show, episode);
-        recordWatch(show.tmdbId);
-
-        // If they were watching right here, try to keep it here.
+        // If they were watching right here, try to keep it here — the theater
+        // handles its own history, timer, and end detection.
         let playedOnSite = false;
         if (lastProviderName === WEBSITE_PROVIDER) {
           const found = await findYouTubeEpisode(show, episode);
           if (found) {
-            embedPlayer(show, episode, found.videoId);
+            startSitePlayback(show, episode, found.videoId);
             playedOnSite = true;
-            const banner = document.querySelector('#np-content .up-next-banner');
-            if (banner) banner.innerHTML = '▶ Autoplay — playing right here, countdown running';
           }
         }
 
         if (!playedOnSite) {
+          // Start the next countdown automatically.
+          startTimer(show.avgRuntimeMin || 22);
+          addToHistory(show, episode);
+          recordWatch(show.tmdbId);
+
           const flatrate = providers && providers.flatrate ? providers.flatrate : [];
           const allowed = flatrate.filter((p) => hasServiceFor(p.provider_name));
           let pick = null;
@@ -1332,6 +1532,7 @@
     renderGreeting();
     el('np-content').innerHTML = '<div class="np-placeholder">— nothing queued up yet —</div>';
     resetTimer();
+    renderResumeChip();
   }
 
   function showProfilesDialog() {
@@ -1678,6 +1879,7 @@
     renderGreeting();
     el('autoplay-toggle').checked = autoplay;
     el('portal-toggle').checked = portalEnabled;
+    renderResumeChip();
     // If they arrived via a backup-email link, log them straight in.
     await maybeRestoreFromLink();
     // First visit (no named account, never dismissed): show the nudge after a moment.
