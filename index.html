@@ -303,6 +303,7 @@
     <p id="greeting" style="display:none; color: var(--teal); font-weight:600; font-size:0.85rem; margin-top:4px;"></p>
     <p id="account-tools" style="display:none; margin-top:6px;">
       <button class="btn btn-ghost btn-small" id="profiles-btn">👤 Profiles</button>
+      <button class="btn btn-ghost btn-small" id="services-btn">📺 My services</button>
       <button class="btn btn-ghost btn-small" id="transfer-btn">📤 Move / back up my account</button>
     </p>
   </header>
@@ -441,6 +442,8 @@
       list: (p && Array.isArray(p.list)) ? p.list : [],
       history: (p && Array.isArray(p.history)) ? p.history.slice(0, 10) : [],
       recent: (p && Array.isArray(p.recent)) ? p.recent.slice(-25) : [],
+      // null = not configured yet; array = only these services get the portal
+      services: (p && Array.isArray(p.services)) ? p.services : null,
     };
   }
 
@@ -875,6 +878,126 @@
     renderYtButton(slot, show, episode, found.videoId);
   }
 
+  // ---------- My services (which streaming accounts this profile has) ----------
+  const SERVICE_OPTIONS = [
+    { token: 'netflix', label: 'Netflix' },
+    { token: 'disney', label: 'Disney+' },
+    { token: 'hulu', label: 'Hulu' },
+    { token: 'max', label: 'Max (HBO)' },
+    { token: 'paramount', label: 'Paramount+' },
+    { token: 'peacock', label: 'Peacock' },
+    { token: 'apple', label: 'Apple TV+' },
+    { token: 'prime', label: 'Prime Video' },
+    { token: 'roku', label: 'The Roku Channel (free)' },
+    { token: 'tubi', label: 'Tubi (free)' },
+  ];
+
+  function hasServiceFor(providerName) {
+    if (!account || account.services === null || account.services === undefined) return true; // not configured — allow all
+    const n = (providerName || '').toLowerCase();
+    return account.services.some((t) => n.indexOf(t) !== -1);
+  }
+
+  function showServicesDialog() {
+    const selected = account.services || [];
+    let boxes = '';
+    SERVICE_OPTIONS.forEach((o) => {
+      const checked = selected.indexOf(o.token) !== -1 ? ' checked' : '';
+      boxes += '<label style="display:flex; align-items:center; gap:8px; margin-bottom:7px; font-size:0.85rem; cursor:pointer;">' +
+        '<input type="checkbox" data-service="' + o.token + '"' + checked + ' /> ' + o.label + '</label>';
+    });
+    el('bubble-inner').innerHTML =
+      '<div class="bubble-title">My streaming services 📺</div>' +
+      'Tick the services this profile has an account on. The auto-portal will only jump to these.' +
+      '<div style="margin-top:10px; max-height:220px; overflow-y:auto;">' + boxes + '</div>' +
+      '<div class="bubble-actions">' +
+        '<button class="btn btn-small" id="services-save-btn">Save</button>' +
+      '</div>' +
+      '<div class="bubble-fineprint">Every service still shows as a button after a shuffle — this only controls which ones the portal auto-opens. Untick everything to turn the portal off.</div>';
+    el('account-bubble').style.display = 'block';
+    el('services-save-btn').addEventListener('click', () => {
+      const picked = [];
+      el('bubble-inner').querySelectorAll('[data-service]').forEach((cb) => {
+        if (cb.checked) picked.push(cb.getAttribute('data-service'));
+      });
+      account.services = picked;
+      saveProfiles();
+      el('bubble-inner').innerHTML =
+        '<div class="bubble-title">Saved! ✅</div>' +
+        (picked.length
+          ? 'The portal will only jump to: ' + picked.map((t) => { const o = SERVICE_OPTIONS.find((x) => x.token === t); return o ? o.label : t; }).join(', ') + '.'
+          : 'No services ticked — the auto-portal is off for this profile.');
+      setTimeout(() => { el('account-bubble').style.display = 'none'; }, 3000);
+    });
+  }
+
+  el('services-btn').addEventListener('click', showServicesDialog);
+
+  // ---------- Portal countdown (signed-in users only) ----------
+  let portalTimer = null;
+
+  function cancelPortal() {
+    if (portalTimer) { clearInterval(portalTimer); portalTimer = null; }
+    const b = el('portal-banner');
+    if (b && b.getAttribute('data-counting') === '1') b.remove();
+  }
+
+  function startPortal(show, episode, providerName, url) {
+    cancelPortal();
+    const np = el('np-content');
+    const banner = document.createElement('div');
+    banner.className = 'up-next-banner';
+    banner.id = 'portal-banner';
+    banner.setAttribute('data-counting', '1');
+    banner.innerHTML = '🌀 Portal to <strong>' + escapeHtml(providerName) + '</strong> in <span id="portal-count">5</span>…' +
+      ' <button class="btn btn-ghost btn-small" id="portal-cancel" style="margin-left:8px;">✕ Cancel</button>';
+    np.insertBefore(banner, np.firstChild);
+    banner.querySelector('#portal-cancel').addEventListener('click', cancelPortal);
+
+    let count = 5;
+    portalTimer = setInterval(() => {
+      count -= 1;
+      const c = el('portal-count');
+      if (!c) { cancelPortal(); return; } // card was replaced
+      if (count > 0) { c.textContent = count; return; }
+      clearInterval(portalTimer);
+      portalTimer = null;
+      enterPortal(show, episode, providerName, url);
+    }, 1000);
+  }
+
+  function enterPortal(show, episode, providerName, url) {
+    const banner = el('portal-banner');
+    if (!banner) return;
+    banner.setAttribute('data-counting', '0');
+
+    // If this episode turned out to be playable right here, portal stays on-site.
+    const ytBtn = document.querySelector('#yt-slot .yt-play-btn');
+    if (ytBtn) { banner.remove(); ytBtn.click(); return; }
+
+    const win = window.open(url, '_blank');
+    if (win) {
+      banner.innerHTML = '🌀 Portaled to <strong>' + escapeHtml(providerName) + '</strong> ✨ — countdown running';
+      lastProviderName = providerName;
+      saveLastProvider();
+      startTimer(show.avgRuntimeMin || 22);
+      addToHistory(show, episode);
+      recordWatch(show.tmdbId);
+    } else {
+      // Browser blocked the auto-open — one tap finishes the jump.
+      banner.innerHTML = '<button class="yt-play-btn" id="portal-go" style="background: var(--accent, #7c5cff);">🌀 Tap to enter portal → ' + escapeHtml(providerName) + '</button>';
+      banner.querySelector('#portal-go').addEventListener('click', () => {
+        window.open(url, '_blank');
+        banner.innerHTML = '🌀 Portaled to <strong>' + escapeHtml(providerName) + '</strong> ✨ — countdown running';
+        lastProviderName = providerName;
+        saveLastProvider();
+        startTimer(show.avgRuntimeMin || 22);
+        addToHistory(show, episode);
+        recordWatch(show.tmdbId);
+      });
+    }
+  }
+
   // ---------- Shuffle / Now Playing ----------
   el('shuffle-btn').addEventListener('click', () => { resetTimer(); doShuffle(); });
 
@@ -969,6 +1092,7 @@
     // Every provider tap starts the countdown for THIS episode's runtime.
     document.querySelectorAll('#np-content .provider-tag[data-runtime]').forEach((tagEl) => {
       tagEl.addEventListener('click', () => {
+        cancelPortal(); // they chose for themselves
         const mins = parseInt(tagEl.getAttribute('data-runtime'), 10) || 22;
         lastProviderName = tagEl.textContent;
         saveLastProvider();
@@ -977,6 +1101,21 @@
         recordWatch(show.tmdbId);
       });
     });
+
+    // Signed-in users get the auto-portal after a manual shuffle — but only
+    // to services this profile actually has an account on.
+    if (!isUpNext && account && account.name && flatrate.length) {
+      const allowed = flatrate.filter((p) => hasServiceFor(p.provider_name));
+      if (allowed.length) {
+        let pick = null;
+        if (lastProviderName && lastProviderName !== WEBSITE_PROVIDER) {
+          pick = allowed.find((p) => p.provider_name === lastProviderName) || null;
+        }
+        if (!pick) pick = allowed[0];
+        startPortal(show, episode, pick.provider_name,
+          buildProviderLink(pick.provider_name, show.title));
+      }
+    }
   }
 
   // Track distinct shows watched (used for the account nudge).
@@ -1077,11 +1216,12 @@
 
         if (!playedOnSite) {
           const flatrate = providers && providers.flatrate ? providers.flatrate : [];
+          const allowed = flatrate.filter((p) => hasServiceFor(p.provider_name));
           let pick = null;
           if (lastProviderName && lastProviderName !== WEBSITE_PROVIDER) {
-            pick = flatrate.find((p) => p.provider_name === lastProviderName) || null;
+            pick = allowed.find((p) => p.provider_name === lastProviderName) || null;
           }
-          if (!pick && flatrate.length) pick = flatrate[0];
+          if (!pick && allowed.length) pick = allowed[0];
           if (pick) {
             const url = buildProviderLink(pick.provider_name, show.title);
             const win = window.open(url, '_blank');
