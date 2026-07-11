@@ -365,6 +365,13 @@
         </span>
         <span>Autoplay — when the countdown ends, queue the next episode and start its timer automatically</span>
       </label>
+      <label class="autoplay-row">
+        <span class="switch">
+          <input type="checkbox" id="portal-toggle" />
+          <span class="slider"></span>
+        </span>
+        <span>Auto-portal — after a shuffle, count down 5 seconds and open the streaming service automatically</span>
+      </label>
     </div>
     <div class="error-msg" id="shuffle-error"></div>
   </div>
@@ -422,6 +429,7 @@
 
   // Autoplay + profile state
   let autoplay = false;
+  let portalEnabled = true;
   let lastProviderName = null;
   let profiles = [];                  // [{ name, email, createdAt, list, history, recent }]
   let activeProfile = 0;
@@ -493,6 +501,7 @@
       region = localStorage.getItem('cartoon-shuffler-region') || 'US';
     } catch (e) { region = 'US'; }
     try { autoplay = localStorage.getItem('cartoon-shuffler-autoplay') === '1'; } catch (e) { autoplay = false; }
+    try { portalEnabled = localStorage.getItem('cartoon-shuffler-portal') !== '0'; } catch (e) { portalEnabled = true; }
     try { lastProviderName = localStorage.getItem('cartoon-shuffler-last-provider') || null; } catch (e) { lastProviderName = null; }
     try { bubbleDismissed = localStorage.getItem('cartoon-shuffler-bubble-dismissed') === '1'; } catch (e) { bubbleDismissed = false; }
     try {
@@ -1104,7 +1113,7 @@
 
     // Signed-in users get the auto-portal after a manual shuffle — but only
     // to services this profile actually has an account on.
-    if (!isUpNext && account && account.name && flatrate.length) {
+    if (portalEnabled && !isUpNext && account && account.name && flatrate.length) {
       const allowed = flatrate.filter((p) => hasServiceFor(p.provider_name));
       if (allowed.length) {
         let pick = null;
@@ -1243,6 +1252,13 @@
   el('autoplay-toggle').addEventListener('change', (e) => {
     autoplay = e.target.checked;
     saveAutoplay();
+  });
+
+  // ---------- Auto-portal toggle ----------
+  el('portal-toggle').addEventListener('change', (e) => {
+    portalEnabled = e.target.checked;
+    try { localStorage.setItem('cartoon-shuffler-portal', portalEnabled ? '1' : '0'); } catch (err) {}
+    if (!portalEnabled) cancelPortal(); // stop a countdown that's mid-flight
   });
 
   // ---------- Daily verse (KJV, rotates by day of year) ----------
@@ -1661,6 +1677,7 @@
     renderVerse();
     renderGreeting();
     el('autoplay-toggle').checked = autoplay;
+    el('portal-toggle').checked = portalEnabled;
     // If they arrived via a backup-email link, log them straight in.
     await maybeRestoreFromLink();
     // First visit (no named account, never dismissed): show the nudge after a moment.
