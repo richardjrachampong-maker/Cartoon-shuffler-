@@ -239,7 +239,7 @@
     { match: /peacock/i, build: (t) => `https://www.peacocktv.com/watch/search?q=${encodeURIComponent(t)}` },
     { match: /apple tv/i, build: (t) => `https://tv.apple.com/search?term=${encodeURIComponent(t)}` },
     { match: /the roku channel/i, build: (t) => `https://therokuchannel.roku.com/search?q=${encodeURIComponent(t)}` },
-    { match: /amazon|prime video/i, build: (t) => `https://www.amazon.com/s?k=${encodeURIComponent(t)}&i=instant-video` },
+    { match: /amazon|prime video/i, build: (t) => `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${encodeURIComponent(t)}` },
     { match: /youtube tv/i, build: () => 'https://tv.youtube.com/' },
     { match: /fubo/i, build: () => 'https://www.fubo.tv/welcome' },
     { match: /philo/i, build: () => 'https://www.philo.com/' },
@@ -415,9 +415,6 @@
       '<div class="ep-line">S' + episode.season_number + 'E' + episode.episode_number + ' · ' + escapeHtml(episode.name || '') + '</div>' +
       providerHtml +
       watchButtonHtml;
-    if (link) {
-      window.open(link, '_blank', 'noopener');
-    }
   }
   function escapeHtml(str) {
     const div = document.createElement('div');
