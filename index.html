@@ -302,6 +302,7 @@
     <p>Add shows you can watch, hit shuffle, land on a random episode.</p>
     <p id="greeting" style="display:none; color: var(--teal); font-weight:600; font-size:0.85rem; margin-top:4px;"></p>
     <p id="account-tools" style="display:none; margin-top:6px;">
+      <button class="btn btn-ghost btn-small" id="profiles-btn">👤 Profiles</button>
       <button class="btn btn-ghost btn-small" id="transfer-btn">📤 Move / back up my account</button>
     </p>
   </header>
@@ -418,39 +419,99 @@
   let isPaused = false;
   let hasStartedThisRound = false;
 
-  // Autoplay + account state
+  // Autoplay + profile state
   let autoplay = false;
   let lastProviderName = null;
-  let account = null;                 // { name, email, createdAt } — saved on this device
+  let profiles = [];                  // [{ name, email, createdAt, list, history, recent }]
+  let activeProfile = 0;
+  let account = null;                 // alias for profiles[activeProfile]
+  let recent = [];                    // active profile's recently-watched episode keys (no-repeat)
+  let sessionSeen = [];               // episode keys skipped this visit (not saved)
   let bubbleDismissed = false;        // user chose "keep browsing" at least once
   let watchedSinceDismiss = [];       // distinct show ids watched since last dismissal
 
   const el = (id) => document.getElementById(id);
 
   // ---------- Persistence ----------
+  function normalizeProfile(p) {
+    return {
+      name: (p && p.name) || null,
+      email: (p && p.email) || null,
+      createdAt: (p && p.createdAt) || Date.now(),
+      list: (p && Array.isArray(p.list)) ? p.list : [],
+      history: (p && Array.isArray(p.history)) ? p.history.slice(0, 10) : [],
+      recent: (p && Array.isArray(p.recent)) ? p.recent.slice(-25) : [],
+    };
+  }
+
   async function loadPersisted() {
+    profiles = [];
     try {
-      const raw = localStorage.getItem('cartoon-shuffler-list');
-      list = raw ? JSON.parse(raw) : [];
-    } catch (e) { list = []; }
+      const rawProfiles = localStorage.getItem('show-shuffler-profiles');
+      if (rawProfiles) {
+        profiles = JSON.parse(rawProfiles).map(normalizeProfile);
+      }
+    } catch (e) { profiles = []; }
+
+    if (!profiles.length) {
+      // First run on the new version — migrate the old single-account data.
+      let legacyAccount = null, legacyList = [], legacyHistory = [];
+      try {
+        const raw = localStorage.getItem('cartoon-shuffler-account');
+        legacyAccount = raw ? JSON.parse(raw) : null;
+      } catch (e) { legacyAccount = null; }
+      try {
+        const raw = localStorage.getItem('cartoon-shuffler-list');
+        legacyList = raw ? JSON.parse(raw) : [];
+      } catch (e) { legacyList = []; }
+      try {
+        const raw = localStorage.getItem('cartoon-shuffler-history');
+        legacyHistory = raw ? JSON.parse(raw) : [];
+      } catch (e) { legacyHistory = []; }
+      profiles = [normalizeProfile({
+        name: legacyAccount ? legacyAccount.name : null,
+        email: legacyAccount ? legacyAccount.email : null,
+        createdAt: legacyAccount ? legacyAccount.createdAt : Date.now(),
+        list: legacyList,
+        history: legacyHistory,
+      })];
+    }
+
+    let idx = 0;
+    try { idx = parseInt(localStorage.getItem('show-shuffler-active') || '0', 10); } catch (e) { idx = 0; }
+    activeProfile = (idx >= 0 && idx < profiles.length) ? idx : 0;
+    const p = profiles[activeProfile];
+    account = p;
+    list = p.list;
+    history = p.history;
+    recent = p.recent;
+
     try {
       region = localStorage.getItem('cartoon-shuffler-region') || 'US';
     } catch (e) { region = 'US'; }
-    try {
-      const raw = localStorage.getItem('cartoon-shuffler-history');
-      history = raw ? JSON.parse(raw) : [];
-    } catch (e) { history = []; }
     try { autoplay = localStorage.getItem('cartoon-shuffler-autoplay') === '1'; } catch (e) { autoplay = false; }
     try { lastProviderName = localStorage.getItem('cartoon-shuffler-last-provider') || null; } catch (e) { lastProviderName = null; }
-    try {
-      const raw = localStorage.getItem('cartoon-shuffler-account');
-      account = raw ? JSON.parse(raw) : null;
-    } catch (e) { account = null; }
     try { bubbleDismissed = localStorage.getItem('cartoon-shuffler-bubble-dismissed') === '1'; } catch (e) { bubbleDismissed = false; }
     try {
       const raw = localStorage.getItem('cartoon-shuffler-watched-since');
       watchedSinceDismiss = raw ? JSON.parse(raw) : [];
     } catch (e) { watchedSinceDismiss = []; }
+  }
+
+  // Write the working arrays back into the active profile, then persist all profiles.
+  function syncProfile() {
+    const p = profiles[activeProfile];
+    if (!p) return;
+    p.list = list;
+    p.history = history;
+    p.recent = recent;
+  }
+  function saveProfiles() {
+    syncProfile();
+    try {
+      localStorage.setItem('show-shuffler-profiles', JSON.stringify(profiles));
+      localStorage.setItem('show-shuffler-active', String(activeProfile));
+    } catch (e) { console.error('Failed to save profiles', e); }
   }
   function saveAutoplay() {
     try { localStorage.setItem('cartoon-shuffler-autoplay', autoplay ? '1' : '0'); } catch (e) {}
@@ -461,7 +522,7 @@
     } catch (e) {}
   }
   function saveAccount() {
-    try { localStorage.setItem('cartoon-shuffler-account', JSON.stringify(account)); } catch (e) {}
+    saveProfiles();
   }
   function saveBubbleState() {
     try {
@@ -470,12 +531,10 @@
     } catch (e) {}
   }
   async function saveHistory() {
-    try { localStorage.setItem('cartoon-shuffler-history', JSON.stringify(history)); }
-    catch (e) { console.error('Failed to save history', e); }
+    saveProfiles();
   }
   async function saveList() {
-    try { localStorage.setItem('cartoon-shuffler-list', JSON.stringify(list)); }
-    catch (e) { console.error('Failed to save list', e); }
+    saveProfiles();
   }
   async function saveRegion() {
     try { localStorage.setItem('cartoon-shuffler-region', region); }
@@ -522,9 +581,14 @@
   async function getShowDetails(tmdbId) {
     return tmdbFetch('/tv/' + tmdbId);
   }
+  const seasonCache = {};
   async function getSeasonEpisodes(tmdbId, seasonNumber) {
+    const key = tmdbId + '-' + seasonNumber;
+    if (seasonCache[key]) return seasonCache[key];
     const data = await tmdbFetch('/tv/' + tmdbId + '/season/' + seasonNumber);
-    return data.episodes || [];
+    const eps = data.episodes || [];
+    seasonCache[key] = eps;
+    return eps;
   }
   async function getWatchProviders(tmdbId, r) {
     const data = await tmdbFetch('/tv/' + tmdbId + '/watch/providers');
@@ -652,6 +716,11 @@
       epTitle: episode.name || '',
     });
     history = history.slice(0, 10);
+    // Remember it so shuffle skips it for a while (last 25 watched).
+    const key = epKey(show.tmdbId, episode.season_number, episode.episode_number);
+    recent = recent.filter((k) => k !== key);
+    recent.push(key);
+    recent = recent.slice(-25);
     await saveHistory();
     renderHistory();
   }
@@ -792,6 +861,32 @@
   // ---------- Shuffle / Now Playing ----------
   el('shuffle-btn').addEventListener('click', () => { resetTimer(); doShuffle(); });
 
+  function epKey(tmdbId, seasonNumber, episodeNumber) {
+    return tmdbId + '-' + seasonNumber + '-' + episodeNumber;
+  }
+
+  // Try a few times to land on something not watched or skipped recently.
+  async function pickFreshEpisode() {
+    let fallback = null;
+    for (let attempt = 0; attempt < 12; attempt++) {
+      const show = list[Math.floor(Math.random() * list.length)];
+      const seasonNumber = 1 + Math.floor(Math.random() * show.numberOfSeasons);
+      let episodes = [];
+      try { episodes = await getSeasonEpisodes(show.tmdbId, seasonNumber); } catch (e) { /* try another */ }
+      if (!episodes.length) continue;
+      const unseen = episodes.filter((ep) => {
+        const key = epKey(show.tmdbId, ep.season_number, ep.episode_number);
+        return recent.indexOf(key) === -1 && sessionSeen.indexOf(key) === -1;
+      });
+      if (unseen.length) {
+        return { show, episode: unseen[Math.floor(Math.random() * unseen.length)] };
+      }
+      // Whole season already seen — remember one in case everything's been seen
+      if (!fallback) fallback = { show, episode: episodes[Math.floor(Math.random() * episodes.length)] };
+    }
+    return fallback; // tiny library — allow a repeat rather than nothing
+  }
+
   async function doShuffle() {
     el('shuffle-error').textContent = '';
     if (list.length === 0) {
@@ -803,14 +898,11 @@
     el('np-content').innerHTML = '<div class="np-placeholder">📼 tuning in…</div>';
 
     try {
-      const show = list[Math.floor(Math.random() * list.length)];
-      const seasonNumber = 1 + Math.floor(Math.random() * show.numberOfSeasons);
-      const episodes = await getSeasonEpisodes(show.tmdbId, seasonNumber);
-      if (!episodes.length) throw new Error('Could not load episodes for "' + show.title + '" — try again.');
-      const episode = episodes[Math.floor(Math.random() * episodes.length)];
-      const providers = await getWatchProviders(show.tmdbId, region);
+      const pick = await pickFreshEpisode();
+      if (!pick) throw new Error('Could not load any episodes — try again.');
+      const providers = await getWatchProviders(pick.show.tmdbId, region);
       hasStartedThisRound = false;
-      renderNowPlaying(show, episode, providers, false);
+      renderNowPlaying(pick.show, pick.episode, providers, false);
     } catch (e) {
       el('shuffle-error').textContent = e.message;
       el('np-content').innerHTML = '<div class="np-placeholder">— no signal —</div>';
@@ -843,7 +935,16 @@
       '<div class="np-ep-line">S' + episode.season_number + 'E' + episode.episode_number + ' · ' + escapeHtml(episode.name || '') + '</div>' +
       hint +
       '<div class="yt-slot" id="yt-slot"></div>' +
-      providerHtml;
+      providerHtml +
+      '<div style="margin-top:12px;"><button class="btn btn-ghost btn-small" id="skip-btn">↻ Nah, spin again</button></div>';
+
+    // Skip: doesn't count as watching, but won't come up again this visit.
+    el('skip-btn').addEventListener('click', () => {
+      const key = epKey(show.tmdbId, episode.season_number, episode.episode_number);
+      if (sessionSeen.indexOf(key) === -1) sessionSeen.push(key);
+      resetTimer();
+      doShuffle();
+    });
 
     // If this episode exists on YouTube, offer to play it right here.
     attachYouTubeOption(show, episode);
@@ -863,7 +964,7 @@
 
   // Track distinct shows watched (used for the account nudge).
   function recordWatch(tmdbId) {
-    if (account) return; // already signed up — nothing to nudge
+    if (account && account.name) return; // already signed up — nothing to nudge
     if (!watchedSinceDismiss.includes(tmdbId)) {
       watchedSinceDismiss.push(tmdbId);
       saveBubbleState();
@@ -932,11 +1033,10 @@
     el('timer-box').style.display = 'none';
     if (list.length === 0) return;
     try {
-      const show = list[Math.floor(Math.random() * list.length)];
-      const seasonNumber = 1 + Math.floor(Math.random() * show.numberOfSeasons);
-      const episodes = await getSeasonEpisodes(show.tmdbId, seasonNumber);
-      if (!episodes.length) return;
-      const episode = episodes[Math.floor(Math.random() * episodes.length)];
+      const next = await pickFreshEpisode();
+      if (!next) return;
+      const show = next.show;
+      const episode = next.episode;
       const providers = await getWatchProviders(show.tmdbId, region);
       renderNowPlaying(show, episode, providers, true);
 
@@ -1042,6 +1142,78 @@
     try { localStorage.setItem('cartoon-shuffler-verse-hidden', todayKey()); } catch (e) {}
   });
 
+  // ---------- Profiles ----------
+  function switchProfile(i) {
+    if (i < 0 || i >= profiles.length || i === activeProfile) return;
+    syncProfile(); // store the current kid's data before moving
+    activeProfile = i;
+    const p = profiles[i];
+    account = p;
+    list = p.list;
+    history = p.history;
+    recent = p.recent;
+    sessionSeen = [];
+    saveProfiles();
+    renderList();
+    renderHistory();
+    renderGreeting();
+    el('np-content').innerHTML = '<div class="np-placeholder">— nothing queued up yet —</div>';
+    resetTimer();
+  }
+
+  function showProfilesDialog() {
+    let rows = '';
+    profiles.forEach((p, i) => {
+      const label = p.name ? escapeHtml(p.name) : '(unnamed)';
+      const mark = i === activeProfile ? ' ✓' : '';
+      rows += '<button class="btn btn-small" data-profile="' + i + '" style="width:100%; margin-bottom:8px;">' +
+        '👤 ' + label + mark + ' <span style="opacity:0.7; font-weight:400;">· ' + (p.list ? p.list.length : 0) + ' shows</span></button>';
+    });
+    el('bubble-inner').innerHTML =
+      '<div class="bubble-title">Who\'s watching? 👀</div>' +
+      rows +
+      '<div class="bubble-actions">' +
+        '<button class="btn btn-ghost btn-small" id="add-profile-btn">➕ Add a profile</button>' +
+      '</div>' +
+      '<div class="bubble-fineprint">Each profile has its own show list, history, and no-repeat memory.</div>';
+    el('account-bubble').style.display = 'block';
+    el('bubble-inner').querySelectorAll('[data-profile]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        switchProfile(parseInt(btn.getAttribute('data-profile'), 10));
+        el('account-bubble').style.display = 'none';
+      });
+    });
+    el('add-profile-btn').addEventListener('click', showAddProfileForm);
+  }
+
+  function showAddProfileForm() {
+    el('bubble-inner').innerHTML =
+      '<div class="bubble-title">Add a profile</div>' +
+      '<input type="text" id="new-profile-name" placeholder="Their name" autocomplete="off" />' +
+      '<div class="error-msg" id="new-profile-error" style="display:none; margin-top:6px;">That name\'s already taken on this device.</div>' +
+      '<div class="bubble-actions">' +
+        '<button class="btn btn-small" id="new-profile-save">Create profile</button>' +
+      '</div>' +
+      '<div class="bubble-fineprint">They start with an empty show list — add their shows after switching.</div>';
+    el('new-profile-name').focus();
+    el('new-profile-save').addEventListener('click', () => {
+      const name = el('new-profile-name').value.trim();
+      if (!name) { el('new-profile-name').style.outline = '2px solid var(--accent-2)'; return; }
+      if (profiles.some((p) => p.name && p.name.toLowerCase() === name.toLowerCase())) {
+        el('new-profile-error').style.display = 'block';
+        return;
+      }
+      profiles.push(normalizeProfile({ name, createdAt: Date.now() }));
+      switchProfile(profiles.length - 1);
+      el('bubble-inner').innerHTML =
+        '<div class="bubble-title">Hi, ' + escapeHtml(name) + '! 👋</div>' +
+        'You\'re on ' + escapeHtml(name) + '\'s profile now — search above to add their shows.';
+      setTimeout(() => { el('account-bubble').style.display = 'none'; }, 3000);
+    });
+  }
+
+  el('profiles-btn').addEventListener('click', showProfilesDialog);
+
   // ---------- Account bubble ----------
   function renderGreeting() {
     const g = el('greeting');
@@ -1057,7 +1229,7 @@
     }
   }
   function showAccountBubble() {
-    if (account) return;
+    if (account && account.name) return;
     el('bubble-inner').innerHTML =
       '<div class="bubble-title">Keep your shuffle list 📋</div>' +
       'Create a free account to save your list of shows — or just keep browsing.' +
@@ -1084,7 +1256,9 @@
     el('acct-save-btn').addEventListener('click', () => {
       const name = el('acct-name').value.trim();
       if (!name) { el('acct-name').style.outline = '2px solid var(--accent-2)'; return; }
-      account = { name, email: el('acct-email').value.trim() || null, createdAt: Date.now() };
+      account.name = name;
+      account.email = el('acct-email').value.trim() || null;
+      account.createdAt = Date.now();
       saveAccount();
       renderGreeting();
       el('bubble-inner').innerHTML =
@@ -1125,11 +1299,16 @@
   }
 
   async function buildBackupCode() {
+    syncProfile();
+    const named = profiles.filter((p) => p.name).map(normalizeProfile);
     const payload = {
       v: 1,
-      account,
+      // Active profile in the old flat format so older versions can still read it
+      account: { name: account.name, email: account.email || null, createdAt: account.createdAt || Date.now() },
       list,
       history: history.slice(0, 10),
+      recent: recent.slice(-25),
+      profiles: named,
       region,
       autoplay,
     };
@@ -1179,14 +1358,41 @@
   }
 
   async function applyBackup(payload) {
-    account = payload.account;
-    list = Array.isArray(payload.list) ? payload.list : [];
-    history = Array.isArray(payload.history) ? payload.history.slice(0, 10) : [];
+    // Old codes hold one flat account; new codes also carry a profiles array.
+    const incoming = (payload.profiles && payload.profiles.length)
+      ? payload.profiles.map(normalizeProfile)
+      : [normalizeProfile({
+          name: payload.account.name,
+          email: payload.account.email || null,
+          createdAt: payload.account.createdAt,
+          list: payload.list,
+          history: payload.history,
+          recent: payload.recent,
+        })];
+
+    syncProfile();
+    incoming.forEach((inp) => {
+      if (!inp.name) return;
+      const i = profiles.findIndex((p) => p.name && p.name.toLowerCase() === inp.name.toLowerCase());
+      if (i >= 0) profiles[i] = inp; else profiles.push(inp);
+    });
+    // Drop a leftover unnamed, empty starter profile.
+    profiles = profiles.filter((p) => p.name || (p.list && p.list.length) || (p.history && p.history.length));
+    if (!profiles.length) profiles = [normalizeProfile({})];
+
+    let idx = profiles.findIndex((p) => p.name === payload.account.name);
+    if (idx < 0) idx = 0;
+    activeProfile = idx;
+    const p = profiles[idx];
+    account = p;
+    list = p.list;
+    history = p.history;
+    recent = p.recent;
+    sessionSeen = [];
+
     region = payload.region || 'US';
     autoplay = payload.autoplay === true;
-    saveAccount();
-    await saveList();
-    await saveHistory();
+    saveProfiles();
     await saveRegion();
     saveAutoplay();
     bubbleDismissed = true; // no need to nudge someone who just logged in
@@ -1221,7 +1427,7 @@
     const link = backupLink(code);
     el('bubble-inner').innerHTML =
       '<div class="bubble-title">Move or back up your account 📤</div>' +
-      'This code holds your account, show list, and history.' +
+      'This code holds every profile on this device — names, show lists, and history.' +
       '<textarea id="transfer-code-box" readonly rows="4" style="width:100%; margin-top:8px; font-family: \'JetBrains Mono\', monospace; font-size:0.68rem; background: var(--bg-elev-2); color: var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; resize:none;"></textarea>' +
       '<div class="bubble-actions">' +
         '<button class="btn btn-small" id="copy-code-btn">📋 Copy code</button>' +
@@ -1275,10 +1481,6 @@
     // Clear the hash either way so the code doesn't linger in the address bar
     try { historyReplace(); } catch (e) {}
     if (!payload) return;
-    if (account && account.name && account.name !== payload.account.name) {
-      const ok = confirm('Log in as ' + payload.account.name + '? This will replace ' + account.name + '\'s account on this device.');
-      if (!ok) return;
-    }
     await applyBackup(payload);
     el('bubble-inner').innerHTML =
       '<div class="bubble-title">Welcome back, ' + escapeHtml(account.name) + '! 🎉</div>' +
@@ -1304,8 +1506,8 @@
     el('autoplay-toggle').checked = autoplay;
     // If they arrived via a backup-email link, log them straight in.
     await maybeRestoreFromLink();
-    // First visit (no account, never dismissed): show the nudge after a moment.
-    if (!account && !bubbleDismissed) {
+    // First visit (no named account, never dismissed): show the nudge after a moment.
+    if (!(account && account.name) && !bubbleDismissed) {
       setTimeout(showAccountBubble, 2500);
     }
   })();
