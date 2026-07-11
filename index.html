@@ -153,7 +153,10 @@
   .provider-tag {
     background: var(--grape); color: white; font-size: 0.75rem; font-weight: 600;
     padding: 5px 10px; border-radius: 20px; border: 2px solid var(--ink);
+    text-decoration: none; cursor: pointer; display: inline-block;
+    transition: transform 0.08s ease;
   }
+  .provider-tag:hover { transform: translateY(-1px); filter: brightness(1.1); }
   .region-row { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 14px; font-size: 0.8rem; }
   .region-row select { width: auto; padding: 4px 8px; }
   .error-msg { color: var(--coral); font-size: 0.85rem; margin-top: 8px; font-weight: 600; }
@@ -226,6 +229,25 @@
   async function saveList() {
     try { localStorage.setItem('cartoon-shuffler-list', JSON.stringify(list)); }
     catch (e) { console.error('Failed to save list', e); }
+  }
+  const PROVIDER_LINK_RULES = [
+    { match: /paramount/i, build: (t) => `https://www.paramountplus.com/search/?query=${encodeURIComponent(t)}` },
+    { match: /disney/i, build: (t) => `https://www.disneyplus.com/search?q=${encodeURIComponent(t)}` },
+    { match: /\bmax\b|hbo/i, build: (t) => `https://play.max.com/search?q=${encodeURIComponent(t)}` },
+    { match: /netflix/i, build: (t) => `https://www.netflix.com/search?q=${encodeURIComponent(t)}` },
+    { match: /\bhulu\b/i, build: (t) => `https://www.hulu.com/search?q=${encodeURIComponent(t)}` },
+    { match: /peacock/i, build: (t) => `https://www.peacocktv.com/watch/search?q=${encodeURIComponent(t)}` },
+    { match: /apple tv/i, build: (t) => `https://tv.apple.com/search?term=${encodeURIComponent(t)}` },
+    { match: /the roku channel/i, build: (t) => `https://therokuchannel.roku.com/search?q=${encodeURIComponent(t)}` },
+    { match: /amazon|prime video/i, build: (t) => `https://www.amazon.com/s?k=${encodeURIComponent(t)}&i=instant-video` },
+    { match: /youtube tv/i, build: () => 'https://tv.youtube.com/' },
+    { match: /fubo/i, build: () => 'https://www.fubo.tv/welcome' },
+    { match: /philo/i, build: () => 'https://www.philo.com/' },
+  ];
+  function buildProviderLink(providerName, showTitle) {
+    const rule = PROVIDER_LINK_RULES.find((r) => r.match.test(providerName));
+    if (rule) return rule.build(showTitle);
+    return `https://www.google.com/search?q=${encodeURIComponent('watch ' + showTitle + ' on ' + providerName)}`;
   }
   async function tmdbFetch(path, params) {
     const url = new URL(TMDB_BASE + path);
@@ -377,7 +399,10 @@
     let providerHtml = '';
     if (flatrate.length) {
       providerHtml = '<div class="providers">' +
-        flatrate.map((p) => '<span class="provider-tag">' + escapeHtml(p.provider_name) + '</span>').join('') +
+        flatrate.map((p) => {
+          const providerUrl = buildProviderLink(p.provider_name, show.title);
+          return '<a class="provider-tag" href="' + providerUrl + '" target="_blank" rel="noopener">' + escapeHtml(p.provider_name) + '</a>';
+        }).join('') +
         '</div>';
     } else {
       providerHtml = '<div class="providers"><span class="provider-tag" style="background:#888;">No streaming match found for ' + region + '</span></div>';
