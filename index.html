@@ -5,162 +5,190 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Cartoon Shuffler</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --paper: #FFF4D6;
-    --ink: #1B1B2F;
-    --coral: #FF4B3E;
-    --teal: #2EC4B6;
-    --sun: #FFC145;
-    --grape: #6C5CE7;
-    --card: #FFFFFF;
-    --shadow: 6px 6px 0px var(--ink);
+    --bg: #0A0B14;
+    --bg-elev: #14162A;
+    --bg-elev-2: #1C1F3A;
+    --text: #F4F1FF;
+    --text-dim: rgba(244,241,255,0.62);
+    --accent: #7C5CFF;
+    --accent-2: #FF3E7F;
+    --teal: #22D3B4;
+    --gold: #FFB020;
+    --border: rgba(255,255,255,0.09);
+    --gradient: linear-gradient(135deg, var(--accent), var(--accent-2));
   }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0;
-    background: var(--paper);
-    color: var(--ink);
+    background: var(--bg);
+    background-image: radial-gradient(circle at 20% 0%, rgba(124,92,255,0.16), transparent 45%),
+                       radial-gradient(circle at 85% 15%, rgba(255,62,127,0.12), transparent 40%);
+    color: var(--text);
     font-family: 'Inter', sans-serif;
-    background-image:
-      radial-gradient(circle, rgba(27,27,47,0.06) 1.5px, transparent 1.5px);
-    background-size: 22px 22px;
+    min-height: 100vh;
   }
-  .wrap { max-width: 900px; margin: 0 auto; padding: 28px 20px 80px; }
-  header { text-align: center; margin-bottom: 28px; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 28px 18px 90px; }
+  header { text-align: center; margin-bottom: 26px; }
   header h1 {
-    font-family: 'Fredoka', sans-serif;
-    font-weight: 700;
-    font-size: clamp(2.2rem, 6vw, 3.2rem);
+    font-family: 'Sora', sans-serif;
+    font-weight: 800;
+    font-size: clamp(2rem, 6vw, 2.9rem);
     margin: 0;
-    letter-spacing: -0.01em;
-    text-shadow: 4px 4px 0 var(--coral);
-    color: var(--paper);
-    -webkit-text-stroke: 2px var(--ink);
+    letter-spacing: -0.02em;
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
-  header p { font-size: 0.95rem; margin-top: 14px; opacity: 0.75; }
+  header p { font-size: 0.92rem; margin-top: 10px; color: var(--text-dim); }
   .panel {
-    background: var(--card);
-    border: 3px solid var(--ink);
-    border-radius: 18px;
-    box-shadow: var(--shadow);
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 20px;
     padding: 22px;
-    margin-bottom: 24px;
+    margin-bottom: 22px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
   }
   .panel h2 {
-    font-family: 'Fredoka', sans-serif;
-    font-size: 1.15rem;
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 1.05rem;
     margin: 0 0 14px;
     display: flex;
     align-items: center;
     gap: 8px;
   }
   input, select, button { font-family: inherit; font-size: 0.95rem; }
-  input[type="text"], input[type="password"], select {
-    border: 2px solid var(--ink);
-    border-radius: 10px;
-    padding: 10px 12px;
-    background: var(--paper);
-    color: var(--ink);
+  input[type="text"], select {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 11px 14px;
+    background: var(--bg-elev-2);
+    color: var(--text);
     width: 100%;
   }
+  input::placeholder { color: var(--text-dim); }
   input:focus, select:focus, button:focus-visible {
-    outline: 3px solid var(--grape);
+    outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
   .btn {
-    font-family: 'Fredoka', sans-serif;
-    font-weight: 600;
-    border: 3px solid var(--ink);
-    border-radius: 12px;
-    padding: 10px 18px;
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    border: none;
+    border-radius: 14px;
+    padding: 11px 20px;
     cursor: pointer;
-    background: var(--sun);
-    color: var(--ink);
-    box-shadow: 3px 3px 0 var(--ink);
-    transition: transform 0.08s ease;
+    color: white;
+    background: var(--gradient);
+    box-shadow: 0 6px 18px rgba(124,92,255,0.35);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
   }
-  .btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
-  .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-  .btn-coral { background: var(--coral); color: white; }
-  .btn-teal { background: var(--teal); color: var(--ink); }
-  .btn-small { padding: 6px 12px; font-size: 0.8rem; box-shadow: 2px 2px 0 var(--ink); }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(124,92,255,0.45); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-ghost { background: var(--bg-elev-2); border: 1px solid var(--border); box-shadow: none; }
+  .btn-small { padding: 7px 14px; font-size: 0.78rem; border-radius: 10px; }
+  .btn-teal { background: var(--teal); color: #05231d; box-shadow: 0 6px 16px rgba(34,211,180,0.3); }
   .row { display: flex; gap: 10px; }
   .row > * { flex: 1; }
-  .hint { font-size: 0.8rem; opacity: 0.65; margin-top: 8px; line-height: 1.5; }
-  .hint a { color: var(--grape); font-weight: 600; }
-  .search-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px; margin-top: 16px; }
+  .error-msg { color: var(--accent-2); font-size: 0.85rem; margin-top: 10px; font-weight: 600; }
+  .empty { text-align: center; padding: 22px; color: var(--text-dim); font-size: 0.9rem; }
+  .search-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(126px, 1fr)); gap: 14px; margin-top: 16px; }
   .show-card {
-    border: 2px solid var(--ink);
-    border-radius: 12px;
-    overflow: hidden;
-    background: var(--paper);
-    display: flex;
-    flex-direction: column;
-  }
-  .show-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; background: #ddd; }
-  .show-card .info { padding: 8px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
-  .show-card .title { font-size: 0.82rem; font-weight: 600; line-height: 1.25; }
-  .list-items { display: flex; flex-direction: column; gap: 10px; }
-  .list-item {
-    display: flex; align-items: center; gap: 12px;
-    border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--paper);
-  }
-  .list-item img { width: 42px; height: 62px; object-fit: cover; border-radius: 6px; border: 2px solid var(--ink); background: #ddd; }
-  .list-item .title { font-weight: 600; flex: 1; font-size: 0.9rem; }
-  .list-item .meta { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; opacity: 0.6; }
-  .empty { text-align: center; padding: 20px; opacity: 0.6; font-size: 0.9rem; }
-  .tv {
-    border: 5px solid var(--ink);
-    border-radius: 22px;
-    background: var(--ink);
-    padding: 16px;
     position: relative;
-    box-shadow: var(--shadow);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--bg-elev-2);
+    aspect-ratio: 2/3;
+    border: 1px solid var(--border);
   }
-  .tv-screen {
-    background: #0c0c16;
-    border-radius: 12px;
-    min-height: 210px;
+  .show-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .show-card .overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(10,11,20,0.95) 10%, rgba(10,11,20,0.15) 55%, transparent 80%);
+    display: flex; flex-direction: column; justify-content: flex-end; padding: 10px;
+  }
+  .show-card .title { font-size: 0.78rem; font-weight: 700; line-height: 1.2; margin-bottom: 8px; }
+  .show-card .btn-small { width: 100%; text-align: center; }
+  .list-count-badge {
+    background: var(--gradient); color: white; font-size: 0.7rem; font-weight: 700;
+    padding: 2px 9px; border-radius: 20px; font-family: 'Sora', sans-serif;
+  }
+  .list-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; }
+  .list-strip::-webkit-scrollbar { height: 6px; }
+  .list-strip::-webkit-scrollbar-thumb { background: var(--bg-elev-2); border-radius: 10px; }
+  .list-chip { position: relative; flex: 0 0 auto; width: 92px; }
+  .list-chip img {
+    width: 92px; height: 138px; object-fit: cover; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-elev-2); display: block;
+  }
+  .list-chip .chip-title { font-size: 0.72rem; font-weight: 600; margin-top: 6px; line-height: 1.25; }
+  .list-chip .chip-meta { font-size: 0.65rem; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+  .list-chip .remove-btn {
+    position: absolute; top: -6px; right: -6px; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--accent-2); color: white; border: 2px solid var(--bg-elev); font-weight: 700; font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1;
+  }
+  .region-row { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 16px; font-size: 0.8rem; color: var(--text-dim); }
+  .region-row select { width: auto; padding: 6px 10px; }
+  .now-playing {
+    border-radius: 20px;
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    position: relative;
+  }
+  .np-backdrop {
+    min-height: 230px;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
-    overflow: hidden;
-    border: 3px solid #333;
+    padding: 26px 20px;
+    text-align: center;
+    background: radial-gradient(circle at 50% 0%, rgba(124,92,255,0.25), transparent 60%);
   }
-  .tv-screen .static {
-    position: absolute; inset: 0;
-    background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 3px);
-    opacity: 0;
-    pointer-events: none;
-  }
-  .tv-screen.flicker .static { animation: staticflicker 0.5s steps(2) 3; }
-  @keyframes staticflicker {
-    0% { opacity: 0.9; }
-    50% { opacity: 0.3; }
-    100% { opacity: 0.9; }
-  }
-  .tv-screen-content { text-align: center; padding: 20px; color: var(--paper); position: relative; z-index: 1; }
-  .tv-screen-content .placeholder { font-family: 'Fredoka', sans-serif; opacity: 0.5; font-size: 1rem; }
-  .tv-screen-content .show-title { font-family: 'Fredoka', sans-serif; font-size: 1.4rem; font-weight: 700; color: var(--sun); }
-  .tv-screen-content .ep-line { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; margin: 6px 0 14px; color: var(--teal); }
-  .tv-controls { display: flex; justify-content: center; gap: 10px; margin-top: 16px; }
-  .knob { width: 14px; height: 14px; border-radius: 50%; background: var(--coral); border: 2px solid var(--paper); display: inline-block; }
-  .providers { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0 16px; }
+  .np-placeholder { font-family: 'Sora', sans-serif; color: var(--text-dim); font-size: 1rem; }
+  .np-content { width: 100%; }
+  .np-show-title { font-family: 'Sora', sans-serif; font-size: 1.5rem; font-weight: 800; color: var(--gold); }
+  .np-ep-line { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; margin: 6px 0 16px; color: var(--teal); }
+  .np-hint { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 14px; }
+  .providers { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 0 0 16px; }
   .provider-tag {
-    background: var(--grape); color: white; font-size: 0.75rem; font-weight: 600;
-    padding: 5px 10px; border-radius: 20px; border: 2px solid var(--ink);
+    background: var(--bg-elev); color: var(--text); font-size: 0.75rem; font-weight: 700;
+    padding: 7px 13px; border-radius: 20px; border: 1px solid var(--border);
     text-decoration: none; cursor: pointer; display: inline-block;
-    transition: transform 0.08s ease;
+    transition: transform 0.1s ease, border-color 0.1s ease;
+    font-family: 'Sora', sans-serif;
   }
-  .provider-tag:hover { transform: translateY(-1px); filter: brightness(1.1); }
-  .region-row { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 14px; font-size: 0.8rem; }
-  .region-row select { width: auto; padding: 4px 8px; }
-  .error-msg { color: var(--coral); font-size: 0.85rem; margin-top: 8px; font-weight: 600; }
-  footer { text-align: center; font-size: 0.75rem; opacity: 0.5; margin-top: 40px; }
+  .provider-tag:hover { transform: translateY(-1px); border-color: var(--accent); }
+  .provider-tag.dim { background: transparent; color: var(--text-dim); }
+  .timer-box { padding: 16px 20px 20px; border-top: 1px solid var(--border); }
+  .timer-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; }
+  .timer-clock { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.1rem; color: var(--gold); }
+  .timer-label { font-size: 0.78rem; color: var(--text-dim); }
+  .progress-track { height: 6px; border-radius: 6px; background: var(--bg-elev); overflow: hidden; margin-bottom: 14px; }
+  .progress-fill { height: 100%; background: var(--gradient); width: 0%; transition: width 1s linear; }
+  .timer-controls { display: flex; justify-content: center; gap: 10px; }
+  .up-next-banner {
+    background: linear-gradient(90deg, rgba(124,92,255,0.18), rgba(255,62,127,0.18));
+    border: 1px solid var(--accent);
+    border-radius: 14px;
+    padding: 10px 14px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+    animation: pulseGlow 1.8s ease-in-out infinite;
+  }
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 0px rgba(124,92,255,0.0); }
+    50% { box-shadow: 0 0 18px rgba(124,92,255,0.35); }
+  }
+  .tv-controls-bottom { display: flex; justify-content: center; padding: 18px 0 4px; }
+  footer { text-align: center; font-size: 0.72rem; color: var(--text-dim); margin-top: 36px; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -179,8 +207,8 @@
     <div class="search-results" id="search-results"></div>
   </div>
   <div class="panel" id="list-panel" style="display:none;">
-    <h2>📋 Your Shuffle List (<span id="list-count">0</span>)</h2>
-    <div class="list-items" id="list-items"></div>
+    <h2>📋 Your Shuffle List <span class="list-count-badge" id="list-count">0</span></h2>
+    <div class="list-strip" id="list-items"></div>
     <div class="empty" id="list-empty">Nothing here yet — search above and add a few cartoons.</div>
   </div>
   <div class="panel" id="shuffle-panel" style="display:none;">
@@ -194,23 +222,33 @@
         <option value="AU">Australia</option>
       </select>
     </div>
-    <div class="tv">
-      <div class="tv-screen" id="tv-screen">
-        <div class="static" id="tv-static"></div>
-        <div class="tv-screen-content" id="tv-content">
-          <div class="placeholder">— no signal —</div>
+    <div class="now-playing" id="now-playing">
+      <div class="np-backdrop">
+        <div class="np-content" id="np-content">
+          <div class="np-placeholder">— nothing queued up yet —</div>
         </div>
       </div>
-      <div class="tv-controls">
-        <span class="knob"></span>
-        <button class="btn btn-coral" id="shuffle-btn" style="font-size:1.05rem; padding:12px 28px;">🔀 Shuffle</button>
-        <span class="knob"></span>
+      <div class="timer-box" id="timer-box" style="display:none;">
+        <div class="timer-row">
+          <span class="timer-label">⏱</span>
+          <span class="timer-clock" id="timer-clock">00:00</span>
+          <span class="timer-label" id="timer-status"></span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="timer-controls">
+          <button class="btn btn-ghost btn-small" id="pause-btn">⏸ Pause</button>
+          <button class="btn btn-ghost btn-small" id="cancel-timer-btn">✕ Cancel timer</button>
+        </div>
       </div>
+    </div>
+    <div class="tv-controls-bottom">
+      <button class="btn" id="shuffle-btn" style="font-size:1.05rem; padding:13px 30px;">🔀 Shuffle</button>
     </div>
     <div class="error-msg" id="shuffle-error"></div>
   </div>
   <footer>
-    Show + streaming-availability data via TMDB. Availability reflects TMDB's own watch-provider data (sourced from JustWatch) and may not always be complete or current.
+    Show + streaming-availability data via TMDB. Availability reflects TMDB's own watch-provider data (sourced from JustWatch) and may not always be complete or current.<br/>
+    The countdown timer is based on the show's average runtime, not real playback — this app can't see what happens inside another site's video player.
   </footer>
 </div>
 <script>
@@ -219,16 +257,29 @@
   const IMG_BASE = 'https://image.tmdb.org/t/p/w300';
   let apiKey = 'fdb3cf1ab625cec36dc770dea7658560';
   let list = [];
+  let region = 'US';
+  let timerInterval = null;
+  let remainingSeconds = 0;
+  let totalSeconds = 0;
+  let isPaused = false;
+  let hasStartedThisRound = false;
   const el = (id) => document.getElementById(id);
   async function loadPersisted() {
     try {
       const raw = localStorage.getItem('cartoon-shuffler-list');
       list = raw ? JSON.parse(raw) : [];
     } catch (e) { list = []; }
+    try {
+      region = localStorage.getItem('cartoon-shuffler-region') || 'US';
+    } catch (e) { region = 'US'; }
   }
   async function saveList() {
     try { localStorage.setItem('cartoon-shuffler-list', JSON.stringify(list)); }
     catch (e) { console.error('Failed to save list', e); }
+  }
+  async function saveRegion() {
+    try { localStorage.setItem('cartoon-shuffler-region', region); }
+    catch (e) { console.error('Failed to save region', e); }
   }
   const PROVIDER_LINK_RULES = [
     { match: /paramount/i, build: (t) => `https://www.paramountplus.com/search/?query=${encodeURIComponent(t)}` },
@@ -271,16 +322,21 @@
     const data = await tmdbFetch('/tv/' + tmdbId + '/season/' + seasonNumber);
     return data.episodes || [];
   }
-  async function getWatchProviders(tmdbId, region) {
+  async function getWatchProviders(tmdbId, r) {
     const data = await tmdbFetch('/tv/' + tmdbId + '/watch/providers');
-    const forRegion = data.results ? data.results[region] : null;
+    const forRegion = data.results ? data.results[r] : null;
     return forRegion || null;
   }
   function renderSetup() {
     el('search-panel').style.display = 'block';
     el('list-panel').style.display = 'block';
     el('shuffle-panel').style.display = 'block';
+    el('region-select').value = region;
   }
+  el('region-select').addEventListener('change', (e) => {
+    region = e.target.value;
+    saveRegion();
+  });
   el('search-btn').addEventListener('click', doSearch);
   el('search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
   async function doSearch() {
@@ -309,9 +365,9 @@
       const already = list.some((s) => s.tmdbId === show.id);
       card.innerHTML =
         '<img src="' + poster + '" alt="" onerror="this.style.visibility=\'hidden\'" />' +
-        '<div class="info">' +
+        '<div class="overlay">' +
           '<div class="title">' + escapeHtml(show.name) + '</div>' +
-          '<button class="btn btn-small ' + (already ? '' : 'btn-teal') + '" data-add="' + show.id + '" ' + (already ? 'disabled' : '') + '>' +
+          '<button class="btn btn-small ' + (already ? 'btn-ghost' : 'btn-teal') + '" data-add="' + show.id + '" ' + (already ? 'disabled' : '') + '>' +
           (already ? 'Added ✓' : '+ Add') +
           '</button>' +
         '</div>';
@@ -325,15 +381,20 @@
     if (list.some((s) => s.tmdbId === tmdbId)) return;
     const found = resultsPool.find((r) => r.id === tmdbId);
     let numberOfSeasons = 1;
+    let avgRuntimeMin = 22;
     try {
       const details = await getShowDetails(tmdbId);
       numberOfSeasons = details.number_of_seasons || 1;
+      if (details.episode_run_time && details.episode_run_time.length) {
+        avgRuntimeMin = details.episode_run_time[0];
+      }
     } catch (e) { }
     list.push({
       tmdbId,
       title: found ? found.name : 'Unknown show',
       posterPath: found ? found.poster_path : null,
       numberOfSeasons,
+      avgRuntimeMin,
     });
     await saveList();
     renderList();
@@ -349,22 +410,23 @@
     const container = el('list-items');
     container.innerHTML = '';
     el('list-empty').style.display = list.length === 0 ? 'block' : 'none';
+    container.style.display = list.length === 0 ? 'none' : 'flex';
     list.forEach((show) => {
-      const item = document.createElement('div');
-      item.className = 'list-item';
+      const chip = document.createElement('div');
+      chip.className = 'list-chip';
       const poster = show.posterPath ? IMG_BASE + show.posterPath : '';
-      item.innerHTML =
+      chip.innerHTML =
+        '<button class="remove-btn" data-remove="' + show.tmdbId + '">×</button>' +
         '<img src="' + poster + '" alt="" onerror="this.style.visibility=\'hidden\'" />' +
-        '<div class="title">' + escapeHtml(show.title) + '</div>' +
-        '<div class="meta">' + show.numberOfSeasons + ' season' + (show.numberOfSeasons === 1 ? '' : 's') + '</div>' +
-        '<button class="btn btn-small" data-remove="' + show.tmdbId + '">Remove</button>';
-      container.appendChild(item);
+        '<div class="chip-title">' + escapeHtml(show.title) + '</div>' +
+        '<div class="chip-meta">' + show.numberOfSeasons + ' szn</div>';
+      container.appendChild(chip);
     });
     container.querySelectorAll('[data-remove]').forEach((btn) => {
       btn.addEventListener('click', () => removeShow(parseInt(btn.getAttribute('data-remove'), 10)));
     });
   }
-  el('shuffle-btn').addEventListener('click', doShuffle);
+  el('shuffle-btn').addEventListener('click', () => { resetTimer(); doShuffle(); });
   async function doShuffle() {
     el('shuffle-error').textContent = '';
     if (list.length === 0) {
@@ -373,48 +435,111 @@
     }
     const btn = el('shuffle-btn');
     btn.disabled = true;
-    const screen = el('tv-screen');
-    screen.classList.add('flicker');
-    el('tv-content').innerHTML = '<div class="placeholder">📼 tuning in…</div>';
+    el('np-content').innerHTML = '<div class="np-placeholder">📼 tuning in…</div>';
     try {
       const show = list[Math.floor(Math.random() * list.length)];
       const seasonNumber = 1 + Math.floor(Math.random() * show.numberOfSeasons);
       const episodes = await getSeasonEpisodes(show.tmdbId, seasonNumber);
       if (!episodes.length) throw new Error('Could not load episodes for "' + show.title + '" — try again.');
       const episode = episodes[Math.floor(Math.random() * episodes.length)];
-      const region = el('region-select').value;
       const providers = await getWatchProviders(show.tmdbId, region);
-      renderShuffleResult(show, episode, providers, region);
+      hasStartedThisRound = false;
+      renderNowPlaying(show, episode, providers, false);
     } catch (e) {
       el('shuffle-error').textContent = e.message;
-      el('tv-content').innerHTML = '<div class="placeholder">— no signal —</div>';
+      el('np-content').innerHTML = '<div class="np-placeholder">— no signal —</div>';
     } finally {
       btn.disabled = false;
-      setTimeout(() => screen.classList.remove('flicker'), 550);
     }
   }
-  function renderShuffleResult(show, episode, providers, region) {
+  function renderNowPlaying(show, episode, providers, isUpNext) {
     const flatrate = providers && providers.flatrate ? providers.flatrate : [];
-    const link = providers && providers.link ? providers.link : null;
     let providerHtml = '';
     if (flatrate.length) {
       providerHtml = '<div class="providers">' +
         flatrate.map((p) => {
-          const providerUrl = buildProviderLink(p.provider_name, show.title);
-          return '<a class="provider-tag" href="' + providerUrl + '" target="_blank" rel="noopener">' + escapeHtml(p.provider_name) + '</a>';
+          const url = buildProviderLink(p.provider_name, show.title);
+          return '<a class="provider-tag" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '">' + escapeHtml(p.provider_name) + '</a>';
         }).join('') +
         '</div>';
     } else {
-      providerHtml = '<div class="providers"><span class="provider-tag" style="background:#888;">No streaming match found for ' + region + '</span></div>';
+      providerHtml = '<div class="providers"><span class="provider-tag dim">No streaming match found for ' + region + '</span></div>';
     }
-    const watchButtonHtml = link
-      ? '<a class="btn btn-coral" href="' + link + '" target="_blank" rel="noopener">▶ Watch options</a>'
-      : '';
-    el('tv-content').innerHTML =
-      '<div class="show-title">' + escapeHtml(show.title) + '</div>' +
-      '<div class="ep-line">S' + episode.season_number + 'E' + episode.episode_number + ' · ' + escapeHtml(episode.name || '') + '</div>' +
-      providerHtml +
-      watchButtonHtml;
+    const banner = isUpNext ? '<div class="up-next-banner">▶ Up next — tap a service below to keep going</div>' : '';
+    const hint = flatrate.length ? '<div class="np-hint">Tap a service to watch — your countdown starts then.</div>' : '';
+    el('np-content').innerHTML =
+      banner +
+      '<div class="np-show-title">' + escapeHtml(show.title) + '</div>' +
+      '<div class="np-ep-line">S' + episode.season_number + 'E' + episode.episode_number + ' · ' + escapeHtml(episode.name || '') + '</div>' +
+      hint +
+      providerHtml;
+    document.querySelectorAll('#np-content .provider-tag[data-runtime]').forEach((tagEl) => {
+      tagEl.addEventListener('click', () => {
+        const mins = parseInt(tagEl.getAttribute('data-runtime'), 10) || 22;
+        startTimer(mins);
+      });
+    });
+  }
+  function startTimer(minutes) {
+    resetTimer();
+    hasStartedThisRound = true;
+    totalSeconds = Math.max(60, minutes * 60);
+    remainingSeconds = totalSeconds;
+    isPaused = false;
+    el('timer-box').style.display = 'block';
+    el('pause-btn').textContent = '⏸ Pause';
+    tickTimer();
+    timerInterval = setInterval(tickTimer, 1000);
+  }
+  function tickTimer() {
+    if (isPaused) return;
+    remainingSeconds -= 1;
+    updateTimerUI();
+    if (remainingSeconds <= 0) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      onTimerFinished();
+    }
+  }
+  function updateTimerUI() {
+    const mm = Math.floor(Math.max(remainingSeconds, 0) / 60).toString().padStart(2, '0');
+    const ss = Math.max(remainingSeconds, 0) % 60;
+    el('timer-clock').textContent = mm + ':' + ss.toString().padStart(2, '0');
+    const pct = totalSeconds > 0 ? Math.min(100, Math.round(((totalSeconds - remainingSeconds) / totalSeconds) * 100)) : 0;
+    el('progress-fill').style.width = pct + '%';
+    el('timer-status').textContent = isPaused ? '(paused)' : '';
+  }
+  el('pause-btn').addEventListener('click', () => {
+    if (!timerInterval && !isPaused) return;
+    isPaused = !isPaused;
+    el('pause-btn').textContent = isPaused ? '▶ Resume' : '⏸ Pause';
+    updateTimerUI();
+  });
+  el('cancel-timer-btn').addEventListener('click', () => { resetTimer(); });
+  function resetTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = null;
+    isPaused = false;
+    remainingSeconds = 0;
+    totalSeconds = 0;
+    hasStartedThisRound = false;
+    el('timer-box').style.display = 'none';
+    el('progress-fill').style.width = '0%';
+  }
+  async function onTimerFinished() {
+    el('timer-box').style.display = 'none';
+    if (list.length === 0) return;
+    try {
+      const show = list[Math.floor(Math.random() * list.length)];
+      const seasonNumber = 1 + Math.floor(Math.random() * show.numberOfSeasons);
+      const episodes = await getSeasonEpisodes(show.tmdbId, seasonNumber);
+      if (!episodes.length) return;
+      const episode = episodes[Math.floor(Math.random() * episodes.length)];
+      const providers = await getWatchProviders(show.tmdbId, region);
+      renderNowPlaying(show, episode, providers, true);
+    } catch (e) {
+      el('np-content').innerHTML = '<div class="np-placeholder">— no signal —</div>';
+    }
   }
   function escapeHtml(str) {
     const div = document.createElement('div');
