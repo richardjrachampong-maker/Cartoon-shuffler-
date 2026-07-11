@@ -763,47 +763,64 @@
     const cacheKey = show.tmdbId + '-' + episode.season_number + '-' + episode.episode_number;
     if (cacheKey in ytCache) return ytCache[cacheKey];
     try {
-      const q = show.title + ' season ' + episode.season_number + ' episode ' + episode.episode_number + ' full episode';
-      const sRes = await fetch(
-        'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&safeSearch=moderate&maxResults=8' +
-        '&q=' + encodeURIComponent(q) + '&key=' + YT_API_KEY
-      );
-      if (!sRes.ok) throw new Error('YouTube search HTTP ' + sRes.status);
-      const sData = await sRes.json();
-      const ids = (sData.items || []).map((i) => i.id && i.id.videoId).filter(Boolean);
-      if (!ids.length) { ytCache[cacheKey] = null; return null; }
-
-      const vRes = await fetch(
-        'https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=' + ids.join(',') + '&key=' + YT_API_KEY
-      );
-      if (!vRes.ok) throw new Error('YouTube videos HTTP ' + vRes.status);
-      const vData = await vRes.json();
-
       const runtime = show.avgRuntimeMin || 22;
       const s = episode.season_number, e = episode.episode_number;
       const epName = (episode.name || '').toLowerCase();
       const showStart = show.title.toLowerCase().slice(0, 12);
-      let best = null, bestScore = 0;
+      const sxe = ['s' + pad2(s) + 'e' + pad2(e), 's' + s + 'e' + e, s + 'x' + pad2(e), 'season ' + s + ' episode ' + e, 'season ' + s + ', episode ' + e];
 
-      (vData.items || []).forEach((v) => {
-        if (v.status && v.status.embeddable === false) return;
-        const mins = isoDurationMinutes(v.contentDetails && v.contentDetails.duration);
-        // Must be roughly episode-length: not a clip, not a 3-hour compilation.
-        if (!mins || mins < runtime * 0.6 || mins > runtime * 2.2) return;
-        const title = ((v.snippet && v.snippet.title) || '').toLowerCase();
-        let score = 0;
-        const sxe = ['s' + pad2(s) + 'e' + pad2(e), 's' + s + 'e' + e, s + 'x' + pad2(e), 'season ' + s + ' episode ' + e, 'season ' + s + ', episode ' + e];
-        if (sxe.some((p) => title.indexOf(p) !== -1)) score += 3;
-        if (title.indexOf('full episode') !== -1 || title.indexOf('full ep') !== -1) score += 2;
-        if (epName && epName.length > 3 && title.indexOf(epName) !== -1) score += 3;
-        if (title.indexOf(showStart) !== -1) score += 1;
-        if (score > bestScore) { bestScore = score; best = v; }
-      });
+      async function ytSearch(q) {
+        const res = await fetch(
+          'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&safeSearch=moderate&maxResults=8' +
+          '&q=' + encodeURIComponent(q) + '&key=' + YT_API_KEY
+        );
+        if (!res.ok) throw new Error('YouTube search HTTP ' + res.status);
+        const data = await res.json();
+        return (data.items || []).map((i) => i.id && i.id.videoId).filter(Boolean);
+      }
 
-      // Need real evidence it's THIS episode, not just any video of the show.
-      const result = (best && bestScore >= 3)
-        ? { videoId: best.id, title: best.snippet ? best.snippet.title : '' }
-        : null;
+      async function bestMatch(ids) {
+        if (!ids.length) return null;
+        const res = await fetch(
+          'https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=' + ids.join(',') + '&key=' + YT_API_KEY
+        );
+        if (!res.ok) throw new Error('YouTube videos HTTP ' + res.status);
+        const data = await res.json();
+        let best = null, bestScore = 0;
+        (data.items || []).forEach((v) => {
+          if (v.status && v.status.embeddable === false) return;
+          const mins = isoDurationMinutes(v.contentDetails && v.contentDetails.duration);
+          // Must be roughly episode-length: not a clip, not a 3-hour compilation.
+          // (Paired-segment shows upload two episodes per video, hence the 2.2x ceiling.)
+          if (!mins || mins < runtime * 0.6 || mins > runtime * 2.2) return;
+          const title = ((v.snippet && v.snippet.title) || '').toLowerCase();
+          const desc = ((v.snippet && v.snippet.description) || '').toLowerCase();
+          let score = 0, epEvidence = false;
+          if (sxe.some((p) => title.indexOf(p) !== -1)) { score += 3; epEvidence = true; }
+          else if (sxe.some((p) => desc.indexOf(p) !== -1)) { score += 1; epEvidence = true; }
+          if (epName && epName.length > 3) {
+            if (title.indexOf(epName) !== -1) { score += 3; epEvidence = true; }
+            else if (desc.indexOf(epName) !== -1) { score += 2; epEvidence = true; }
+          }
+          if (title.indexOf('full episode') !== -1 || title.indexOf('full ep') !== -1) score += 2;
+          if (title.indexOf(showStart) !== -1 || desc.indexOf(showStart) !== -1) score += 1;
+          // Require real evidence it's THIS episode, not just any video of the show.
+          if (!epEvidence) return;
+          if (score > bestScore) { bestScore = score; best = v; }
+        });
+        return (best && bestScore >= 3) ? { videoId: best.id, title: best.snippet ? best.snippet.title : '' } : null;
+      }
+
+      // Round 1: search by season/episode number.
+      let result = await bestMatch(await ytSearch(
+        show.title + ' season ' + s + ' episode ' + e + ' full episode'
+      ));
+      // Round 2: search by episode NAME — catches videos titled after a paired
+      // segment (e.g. two 11-min cartoons uploaded as one video under the
+      // other segment's title, with this one named in the description).
+      if (!result && episode.name) {
+        result = await bestMatch(await ytSearch(show.title + ' ' + episode.name));
+      }
       ytCache[cacheKey] = result;
       return result;
     } catch (err) {
