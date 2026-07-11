@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cartoon Shuffler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #FFF4D6;
+    --ink: #1B1B2F;
+    --coral: #FF4B3E;
+    --teal: #2EC4B6;
+    --sun: #FFC145;
+    --grape: #6C5CE7;
+    --card: #FFFFFF;
+    --shadow: 6px 6px 0px var(--ink);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    background-image:
+      radial-gradient(circle, rgba(27,27,47,0.06) 1.5px, transparent 1.5px);
+    background-size: 22px 22px;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  header { text-align: center; margin-bottom: 28px; }
+  header h1 {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: clamp(2.2rem, 6vw, 3.2rem);
+    margin: 0;
+    letter-spacing: -0.01em;
+    text-shadow: 4px 4px 0 var(--coral);
+    color: var(--paper);
+    -webkit-text-stroke: 2px var(--ink);
+  }
+  header p {
+    font-size: 0.95rem;
+    margin-top: 14px;
+    opacity: 0.75;
+  }
+
+  .panel {
+    background: var(--card);
+    border: 3px solid var(--ink);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 22px;
+    margin-bottom: 24px;
+  }
+
+  .panel h2 {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 1.15rem;
+    margin: 0 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  input, select, button {
+    font-family: inherit;
+    font-size: 0.95rem;
+  }
+  input[type="text"], input[type="password"], select {
+    border: 2px solid var(--ink);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: var(--paper);
+    color: var(--ink);
+    width: 100%;
+  }
+  input:focus, select:focus, button:focus-visible {
+    outline: 3px solid var(--grape);
+    outline-offset: 2px;
+  }
+
+  .btn {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 600;
+    border: 3px solid var(--ink);
+    border-radius: 12px;
+    padding: 10px 18px;
+    cursor: pointer;
+    background: var(--sun);
+    color: var(--ink);
+    box-shadow: 3px 3px 0 var(--ink);
+    transition: transform 0.08s ease;
+  }
+  .btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--ink); }
+  .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+  .btn-coral { background: var(--coral); color: white; }
+  .btn-teal { background: var(--teal); color: var(--ink); }
+  .btn-small { padding: 6px 12px; font-size: 0.8rem; box-shadow: 2px 2px 0 var(--ink); }
+
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+
+  .hint { font-size: 0.8rem; opacity: 0.65; margin-top: 8px; line-height: 1.5; }
+  .hint a { color: var(--grape); font-weight: 600; }
+
+  .search-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px; margin-top: 16px; }
+  .show-card {
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--paper);
+    display: flex;
+    flex-direction: column;
+  }
+  .show-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; background: #ddd; }
+  .show-card .info { padding: 8px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .show-card .title { font-size: 0.82rem; font-weight: 600; line-height: 1.25; }
+
+  .list-items { display: flex; flex-direction: column; gap: 10px; }
+  .list-item {
+    display: flex; align-items: center; gap: 12px;
+    border: 2px solid var(--ink); border-radius: 12px; padding: 8px 10px; background: var(--paper);
+  }
+  .list-item img { width: 42px; height: 62px; object-fit: cover; border-radius: 6px; border: 2px solid var(--ink); background: #ddd; }
+  .list-item .title { font-weight: 600; flex: 1; font-size: 0.9rem; }
+  .list-item .meta { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; opacity: 0.6; }
+
+  .empty { text-align: center; padding: 20px; opacity: 0.6; font-size: 0.9rem; }
+
+  /* --- TV / Shuffle signature element --- */
+  .tv {
+    border: 5px solid var(--ink);
+    border-radius: 22px;
+    background: var(--ink);
+    padding: 16px;
+    position: relative;
+    box-shadow: var(--shadow);
+  }
+  .tv-screen {
+    background: #0c0c16;
+    border-radius: 12px;
+    min-height: 210px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    border: 3px solid #333;
+  }
+  .tv-screen .static {
+    position: absolute; inset: 0;
+    background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 3px);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .tv-screen.flicker .static { animation: staticflicker 0.5s steps(2) 3; }
+  @keyframes staticflicker {
+    0% { opacity: 0.9; }
+    50% { opacity: 0.3; }
+    100% { opacity: 0.9; }
+  }
+  .tv-screen-content { text-align: center; padding: 20px; color: var(--paper); position: relative; z-index: 1; }
+  .tv-screen-content .placeholder { font-family: 'Fredoka', sans-serif; opacity: 0.5; font-size: 1rem; }
+  .tv-screen-content .show-title { font-family: 'Fredoka', sans-serif; font-size: 1.4rem; font-weight: 700; color: var(--sun); }
+  .tv-screen-content .ep-line { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; margin: 6px 0 14px; color: var(--teal); }
+  .tv-controls { display: flex; justify-content: center; gap: 10px; margin-top: 16px; }
+  .knob { width: 14px; height: 14px; border-radius: 50%; background: var(--coral); border: 2px solid var(--paper); display: inline-block; }
+
+  .providers { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0 16px; }
+  .provider-tag {
+    background: var(--grape); color: white; font-size: 0.75rem; font-weight: 600;
+    padding: 5px 10px; border-radius: 20px; border: 2px solid var(--ink);
+  }
+
+  .region-row { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 14px; font-size: 0.8rem; }
+  .region-row select { width: auto; padding: 4px 8px; }
+
+  .error-msg { color: var(--coral); font-size: 0.85rem; margin-top: 8px; font-weight: 600; }
+
+  footer { text-align: center; font-size: 0.75rem; opacity: 0.5; margin-top: 40px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📺 Cartoon Shuffler</h1>
+    <p>Add cartoons you can watch, hit shuffle, land on a random episode.</p>
+  </header>
+
+  <!-- Setup panel: TMDB key -->
+  <div class="panel" id="setup-panel" style="display:none;">
+    <h2>🔑 Connect TMDB</h2>
+    <p style="font-size:0.85rem; margin-top:0;">This app needs a free TMDB API key to search shows and check where they stream. It's stored only for you, in this app's memory — never sent anywhere but TMDB.</p>
+    <div class="row">
+      <input type="password" id="api-key-input" placeholder="Paste your TMDB API key (v3 auth)" />
+      <button class="btn btn-coral" id="save-key-btn" style="flex:0 0 auto;">Save</button>
+    </div>
+    <div class="hint">
+      Don't have one? <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">Get a free key at themoviedb.org</a> — sign up, go to Settings → API, request a key (choose "Developer"), and paste the "API Key (v3 auth)" value here.
+    </div>
+    <div class="error-msg" id="setup-error"></div>
+  </div>
+
+  <!-- Search panel -->
+  <div class="panel" id="search-panel" style="display:none;">
+    <h2>🔍 Find cartoons</h2>
+    <div class="row">
+      <input type="text" id="search-input" placeholder="Search for a cartoon…" />
+      <button class="btn btn-teal" id="search-btn" style="flex:0 0 auto;">Search</button>
+    </div>
+    <div class="error-msg" id="search-error"></div>
+    <div class="search-results" id="search-results"></div>
+  </div>
+
+  <!-- Shuffle List panel -->
+  <div class="panel" id="list-panel" style="display:none;">
+    <h2>📋 Your Shuffle List (<span id="list-count">0</span>)</h2>
+    <div class="list-items" id="list-items"></div>
+    <div class="empty" id="list-empty">Nothing here yet — search above and add a few cartoons.</div>
+  </div>
+
+  <!-- Shuffle TV panel -->
+  <div class="panel" id="shuffle-panel" style="display:none;">
+    <h2>🎲 Shuffle</h2>
+    <div class="region-row">
+      <span>Region:</span>
+      <select id="region-select">
+        <option value="US">United States</option>
+        <option value="GB">United Kingdom</option>
+        <option value="CA">Canada</option>
+        <option value="AU">Australia</option>
+      </select>
+    </div>
+    <div class="tv">
+      <div class="tv-screen" id="tv-screen">
+        <div class="static" id="tv-static"></div>
+        <div class="tv-screen-content" id="tv-content">
+          <div class="placeholder">— no signal —</div>
+        </div>
+      </div>
+      <div class="tv-controls">
+        <span class="knob"></span>
+        <button class="btn btn-coral" id="shuffle-btn" style="font-size:1.05rem; padding:12px 28px;">🔀 Shuffle</button>
+        <span class="knob"></span>
+      </div>
+    </div>
+    <div class="error-msg" id="shuffle-error"></div>
+  </div>
+
+  <footer>
+    Show + streaming-availability data via TMDB. Availability reflects TMDB's own watch-provider data (sourced from JustWatch) and may not always be complete or current.
+  </footer>
+</div>
+
+<script>
+(function () {
+  const TMDB_BASE = 'https://api.themoviedb.org/3';
+  const IMG_BASE = 'https://image.tmdb.org/t/p/w300';
+
+  let apiKey = null;
+  let list = []; // [{ tmdbId, title, posterPath, numberOfSeasons }]
+
+  const el = (id) => document.getElementById(id);
+
+  // ---------- Persistent storage helpers ----------
+  async function loadPersisted() {
+    try {
+      const keyRes = await window.storage.get('tmdb-api-key', false);
+      apiKey = keyRes ? keyRes.value : null;
+    } catch (e) { apiKey = null; }
+
+    try {
+      const listRes = await window.storage.get('shuffle-list', false);
+      list = listRes ? JSON.parse(listRes.value) : [];
+    } catch (e) { list = []; }
+  }
+
+  async function saveApiKey(key) {
+    apiKey = key;
+    try { await window.storage.set('tmdb-api-key', key, false); }
+    catch (e) { console.error('Failed to save API key', e); }
+  }
+
+  async function saveList() {
+    try { await window.storage.set('shuffle-list', JSON.stringify(list), false); }
+    catch (e) { console.error('Failed to save list', e); }
+  }
+
+  // ---------- TMDB calls ----------
+  async function tmdbFetch(path, params) {
+    const url = new URL(TMDB_BASE + path);
+    url.searchParams.set('api_key', apiKey);
+    Object.entries(params || {}).forEach(([k, v]) => url.searchParams.set(k, v));
+    const res = await fetch(url.toString());
+    if (!res.ok) {
+      if (res.status === 401) throw new Error('That API key was rejected by TMDB — double check it and try again.');
+      throw new Error('TMDB request failed (' + res.status + ')');
+    }
+    return res.json();
+  }
+
+  async function searchShows(query) {
+    const data = await tmdbFetch('/search/tv', { query });
+    return data.results || [];
+  }
+
+  async function getShowDetails(tmdbId) {
+    return tmdbFetch('/tv/' + tmdbId);
+  }
+
+  async function getSeasonEpisodes(tmdbId, seasonNumber) {
+    const data = await tmdbFetch('/tv/' + tmdbId + '/season/' + seasonNumber);
+    return data.episodes || [];
+  }
+
+  async function getWatchProviders(tmdbId, region) {
+    const data = await tmdbFetch('/tv/' + tmdbId + '/watch/providers');
+    const forRegion = data.results ? data.results[region] : null;
+    return forRegion || null;
+  }
+
+  // ---------- Rendering: setup ----------
+  function renderSetup() {
+    const hasKey = !!apiKey;
+    el('setup-panel').style.display = hasKey ? 'none' : 'block';
+    el('search-panel').style.display = hasKey ? 'block' : 'none';
+    el('list-panel').style.display = hasKey ? 'block' : 'none';
+    el('shuffle-panel').style.display = hasKey ? 'block' : 'none';
+  }
+
+  el('save-key-btn').addEventListener('click', async () => {
+    const val = el('api-key-input').value.trim();
+    el('setup-error').textContent = '';
+    if (!val) { el('setup-error').textContent = 'Paste a key first.'; return; }
+    try {
+      // Validate by making a tiny request.
+      apiKey = val;
+      await tmdbFetch('/configuration');
+      await saveApiKey(val);
+      renderSetup();
+    } catch (e) {
+      apiKey = null;
+      el('setup-error').textContent = e.message;
+    }
+  });
+
+  // ---------- Rendering: search ----------
+  el('search-btn').addEventListener('click', doSearch);
+  el('search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
+
+  async function doSearch() {
+    const q = el('search-input').value.trim();
+    el('search-error').textContent = '';
+    el('search-results').innerHTML = '';
+    if (!q) return;
+    try {
+      const results = await searchShows(q);
+      renderSearchResults(results);
+    } catch (e) {
+      el('search-error').textContent = e.message;
+    }
+  }
+
+  function renderSearchResults(results) {
+    const container = el('search-results');
+    container.innerHTML = '';
+    if (results.length === 0) {
+      container.innerHTML = '<div class="empty">No shows found.</div>';
+      return;
+    }
+    results.slice(0, 12).forEach((show) => {
+      const card = document.createElement('div');
+      card.className = 'show-card';
+      const poster = show.poster_path ? IMG_BASE + show.poster_path : '';
+      const already = list.some((s) => s.tmdbId === show.id);
+      card.innerHTML =
+        '<img src="' + poster + '" alt="" onerror="this.style.visibility=\'hidden\'" />' +
+        '<div class="info">' +
+          '<div class="title">' + escapeHtml(show.name) + '</div>' +
+          '<button class="btn btn-small ' + (already ? '' : 'btn-teal') + '" data-add="' + show.id + '" ' + (already ? 'disabled' : '') + '>' +
+          (already ? 'Added ✓' : '+ Add') +
+          '</button>' +
+        '</div>';
+      container.appendChild(card);
+    });
+    container.querySelectorAll('[data-add]').forEach((btn) => {
+      btn.addEventListener('click', () => addShow(parseInt(btn.getAttribute('data-add'), 10), results));
+    });
+  }
+
+  async function addShow(tmdbId, resultsPool) {
+    if (list.some((s) => s.tmdbId === tmdbId)) return;
+    const found = resultsPool.find((r) => r.id === tmdbId);
+    // Fetch season count so shuffle doesn't need to look it up every time.
+    let numberOfSeasons = 1;
+    try {
+      const details = await getShowDetails(tmdbId);
+      numberOfSeasons = details.number_of_seasons || 1;
+    } catch (e) { /* fall back to 1 season if this fails */ }
+
+    list.push({
+      tmdbId,
+      title: found ? found.name : 'Unknown show',
+      posterPath: found ? found.poster_path : null,
+      numberOfSeasons,
+    });
+    await saveList();
+    renderList();
+    doSearch(); // refresh "Added ✓" state
+  }
+
+  async function removeShow(tmdbId) {
+    list = list.filter((s) => s.tmdbId !== tmdbId);
+    await saveList();
+    renderList();
+  }
+
+  // ---------- Rendering: list ----------
+  function renderList() {
+    el('list-count').textContent = list.length;
+    const container = el('list-items');
+    container.innerHTML = '';
+    el('list-empty').style.display = list.length === 0 ? 'block' : 'none';
+    list.forEach((show) => {
+      const item = document.createElement('div');
+      item.className = 'list-item';
+      const poster = show.posterPath ? IMG_BASE + show.posterPath : '';
+      item.innerHTML =
+        '<img src="' + poster + '" alt="" onerror="this.style.visibility=\'hidden\'" />' +
+        '<div class="title">' + escapeHtml(show.title) + '</div>' +
+        '<div class="meta">' + show.numberOfSeasons + ' season' + (show.numberOfSeasons === 1 ? '' : 's') + '</div>' +
+        '<button class="btn btn-small" data-remove="' + show.tmdbId + '">Remove</button>';
+      container.appendChild(item);
+    });
+    container.querySelectorAll('[data-remove]').forEach((btn) => {
+      btn.addEventListener('click', () => removeShow(parseInt(btn.getAttribute('data-remove'), 10)));
+    });
+  }
+
+  // ---------- Shuffle ----------
+  el('shuffle-btn').addEventListener('click', doShuffle);
+
+  async function doShuffle() {
+    el('shuffle-error').textContent = '';
+    if (list.length === 0) {
+      el('shuffle-error').textContent = 'Add at least one show to your list first.';
+      return;
+    }
+
+    const btn = el('shuffle-btn');
+    btn.disabled = true;
+    const screen = el('tv-screen');
+    screen.classList.add('flicker');
+    el('tv-content').innerHTML = '<div class="placeholder">📼 tuning in…</div>';
+
+    try {
+      const show = list[Math.floor(Math.random() * list.length)];
+      const seasonNumber = 1 + Math.floor(Math.random() * show.numberOfSeasons);
+      const episodes = await getSeasonEpisodes(show.tmdbId, seasonNumber);
+      if (!episodes.length) throw new Error('Could not load episodes for "' + show.title + '" — try again.');
+      const episode = episodes[Math.floor(Math.random() * episodes.length)];
+
+      const region = el('region-select').value;
+      const providers = await getWatchProviders(show.tmdbId, region);
+
+      renderShuffleResult(show, episode, providers, region);
+    } catch (e) {
+      el('shuffle-error').textContent = e.message;
+      el('tv-content').innerHTML = '<div class="placeholder">— no signal —</div>';
+    } finally {
+      btn.disabled = false;
+      setTimeout(() => screen.classList.remove('flicker'), 550);
+    }
+  }
+
+  function renderShuffleResult(show, episode, providers, region) {
+    const flatrate = providers && providers.flatrate ? providers.flatrate : [];
+    const link = providers && providers.link ? providers.link : null;
+
+    let providerHtml = '';
+    if (flatrate.length) {
+      providerHtml = '<div class="providers">' +
+        flatrate.map((p) => '<span class="provider-tag">' + escapeHtml(p.provider_name) + '</span>').join('') +
+        '</div>';
+    } else {
+      providerHtml = '<div class="providers"><span class="provider-tag" style="background:#888;">No streaming match found for ' + region + '</span></div>';
+    }
+
+    const watchButtonHtml = link
+      ? '<a class="btn btn-coral" href="' + link + '" target="_blank" rel="noopener">▶ Watch options</a>'
+      : '';
+
+    el('tv-content').innerHTML =
+      '<div class="show-title">' + escapeHtml(show.title) + '</div>' +
+      '<div class="ep-line">S' + episode.season_number + 'E' + episode.episode_number + ' · ' + escapeHtml(episode.name || '') + '</div>' +
+      providerHtml +
+      watchButtonHtml;
+  }
+
+  // ---------- utils ----------
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str == null ? '' : String(str);
+    return div.innerHTML;
+  }
+
+  // ---------- init ----------
+  (async function init() {
+    await loadPersisted();
+    renderSetup();
+    renderList();
+  })();
+})();
+</script>
+</body>
+</html>
