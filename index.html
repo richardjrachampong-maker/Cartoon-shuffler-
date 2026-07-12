@@ -22,12 +22,55 @@
     --text-dim: rgba(244,241,255,0.62);
     --accent: #7C5CFF;
     --accent-2: #FF3E7F;
+    --accent-ink: #ffffff;
     --teal: #22D3B4;
     --gold: #FFB020;
     --border: rgba(255,255,255,0.09);
     --gradient: linear-gradient(135deg, var(--accent), var(--accent-2));
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  /* ---------- Light mode: baby blue + white ---------- */
+  body.light-mode {
+    --bg: #FFFFFF;
+    --bg-elev: #E4F1FB;
+    --bg-elev-2: #EFF6FD;
+    --text: #21405C;
+    --text-dim: #5A7186;
+    --accent: #4FA3E3;
+    --accent-2: #7CC3F0;
+    --accent-ink: #ffffff;
+    --teal: #2E9DB5;
+    --gold: #2A6B9E;
+    --border: rgba(33,64,92,0.12);
+    --gradient: linear-gradient(135deg, #4FA3E3, #7CC3F0);
+  }
+  body.light-mode {
+    background-image: none;
+    background-color: #FFFFFF;
+  }
+  body.light-mode .panel {
+    background: linear-gradient(160deg, #DCEDFB 0%, #F3FAFE 100%);
+    box-shadow: 0 8px 26px rgba(33,64,92,0.10);
+  }
+  body.light-mode .btn { color: #fff; box-shadow: 0 6px 18px rgba(79,163,227,0.32); }
+  body.light-mode .btn:hover { box-shadow: 0 8px 22px rgba(79,163,227,0.42); }
+  body.light-mode .provider-primary { box-shadow: 0 8px 22px rgba(79,163,227,0.32); }
+  body.light-mode .np-backdrop { background: radial-gradient(circle at 50% 0%, rgba(122,190,240,0.28), transparent 65%); }
+  body.light-mode .list-strip .chip-fade,
+  body.light-mode .list-chip .chip-title-wrap { }
+  body.light-mode .account-bubble { box-shadow: 0 12px 34px rgba(33,64,92,0.18), 0 0 18px rgba(79,163,227,0.18); }
+  body.light-mode .show-card .overlay { color: #fff; }
+  .theme-toggle-corner {
+    position: fixed; top: 14px; right: 14px; z-index: 50;
+    width: 42px; height: 42px; border-radius: 50%;
+    background: var(--bg-elev-2); border: 1px solid var(--border); color: var(--text);
+    font-size: 1.1rem; cursor: pointer; line-height: 1;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+  }
+  body.light-mode .theme-toggle-corner { box-shadow: 0 4px 14px rgba(33,64,92,0.16); }
+  .theme-toggle-corner:active { transform: scale(0.94); }
   body {
     margin: 0;
     background: var(--bg);
@@ -101,7 +144,7 @@
   .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(124,92,255,0.45); }
   .btn:active { transform: translateY(1px); }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
-  .btn-ghost { background: var(--bg-elev-2); border: 1px solid var(--border); box-shadow: none; }
+  .btn-ghost { background: var(--bg-elev-2); border: 1px solid var(--border); box-shadow: none; color: var(--text); }
   .btn-small { padding: 7px 14px; font-size: 0.78rem; border-radius: 10px; }
   .btn-teal { background: var(--teal); color: #05231d; box-shadow: 0 6px 16px rgba(34,211,180,0.3); }
 
@@ -172,10 +215,10 @@
   .watch-primary { margin: 6px 0 4px; }
   .provider-primary {
     display: block; text-align: center; text-decoration: none;
-    background: linear-gradient(135deg, var(--teal), #4f8cff); color: #041018;
+    background: var(--gradient); color: #fff;
     font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.05rem;
-    padding: 15px 20px; border-radius: 16px; border: none;
-    box-shadow: 0 10px 26px rgba(79,140,255,.28);
+    padding: 15px 20px; border-radius: 14px; border: none;
+    box-shadow: 0 8px 22px rgba(124,92,255,0.35);
   }
   .provider-primary:active { transform: translateY(1px); }
   .other-services { margin-top: 12px; }
@@ -187,13 +230,6 @@
   .other-services summary::before { content: '▸ '; }
   .other-services[open] summary::before { content: '▾ '; }
   .other-services .providers { margin-top: 10px; }
-  .yt-play-btn {
-    display: block; width: 100%; text-align: center;
-    background: linear-gradient(135deg, #ff4d6d, #ff8a5c); color: #2a0410;
-    font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.05rem;
-    padding: 15px 20px; border-radius: 16px; border: none; cursor: pointer;
-    box-shadow: 0 10px 26px rgba(255,77,109,.28); margin: 6px 0;
-  }
   .np-escape { margin-top: 8px; }
 
   .now-playing {
@@ -215,8 +251,18 @@
   }
   .np-placeholder { font-family: 'Sora', sans-serif; color: var(--text-dim); font-size: 1rem; }
   .np-content { width: 100%; }
-  .np-show-title { font-family: 'Sora', sans-serif; font-size: 1.5rem; font-weight: 800; color: var(--gold); }
-  .np-ep-line { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; margin: 6px 0 16px; color: var(--teal); }
+  /* Hero artwork: episode still or show poster, fading into the card. */
+  .np-art {
+    position: relative; width: 100%; aspect-ratio: 16 / 9;
+    border-radius: 14px; overflow: hidden; margin-bottom: 14px;
+    background: var(--bg-elev) center/cover no-repeat;
+  }
+  .np-art::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to top, var(--bg-elev-2) 2%, rgba(26,30,39,0.15) 45%, transparent 75%);
+  }
+  .np-show-title { font-family: 'Sora', sans-serif; font-size: 1.5rem; font-weight: 800; color: var(--gold); line-height: 1.15; }
+  .np-ep-line { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; margin: 6px 0 16px; color: var(--teal); letter-spacing: 0.02em; }
   .np-hint { font-size: 0.78rem; color: var(--text-dim); margin-bottom: 14px; }
 
   .providers { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 0 0 16px; }
@@ -353,6 +399,7 @@
 </style>
 </head>
 <body>
+<button id="theme-toggle" class="theme-toggle-corner" aria-label="Switch light or dark mode">☀️</button>
 <div class="wrap">
   <header>
     <h1>📺 Show Shuffler</h1>
@@ -459,6 +506,7 @@
 (function () {
   const TMDB_BASE = 'https://api.themoviedb.org/3';
   const IMG_BASE = 'https://image.tmdb.org/t/p/w300';
+  const STILL_BASE = 'https://image.tmdb.org/t/p/w780';
   let apiKey = 'fdb3cf1ab625cec36dc770dea7658560';
 
   // ▼▼▼ YOUTUBE SETUP — paste your YouTube API key between the quotes below ▼▼▼
@@ -497,7 +545,6 @@
 
   // Autoplay + profile state
   let autoplay = false;
-  let portalEnabled = true;
   let lastProviderName = null;
   let profiles = [];                  // [{ name, email, createdAt, list, history, recent }]
   let activeProfile = 0;
@@ -571,7 +618,6 @@
       region = localStorage.getItem('cartoon-shuffler-region') || 'US';
     } catch (e) { region = 'US'; }
     try { const a = localStorage.getItem('cartoon-shuffler-autoplay'); autoplay = (a === null) ? true : (a === '1'); } catch (e) { autoplay = true; }
-    try { portalEnabled = localStorage.getItem('cartoon-shuffler-portal') !== '0'; } catch (e) { portalEnabled = true; }
     try { lastProviderName = localStorage.getItem('cartoon-shuffler-last-provider') || null; } catch (e) { lastProviderName = null; }
     try { watchmodeKey = localStorage.getItem('cartoon-shuffler-watchmode-key') || WATCHMODE_API_KEY; } catch (e) { watchmodeKey = WATCHMODE_API_KEY; }
     try { bubbleDismissed = localStorage.getItem('cartoon-shuffler-bubble-dismissed') === '1'; } catch (e) { bubbleDismissed = false; }
@@ -691,8 +737,6 @@
   }
   function wmFresh(entry) { return entry && (Date.now() - entry.t) < WM_TTL_MS; }
 
-  const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent);
-  const isAndroid = /Android/.test(navigator.userAgent);
   function pickDeepUrl(src) {
     // Prefer the real web page (least likely to 404). Fall back to app deep
     // links only if there's no web URL. Reject anything that isn't http(s).
@@ -910,6 +954,26 @@
     saveRegion();
   });
 
+  // ---------- Light / dark theme ----------
+  function applyTheme(mode) {
+    const light = mode === 'light';
+    document.body.classList.toggle('light-mode', light);
+    const btn = el('theme-toggle');
+    if (btn) { btn.textContent = light ? '🌙' : '☀️'; btn.title = light ? 'Switch to dark mode' : 'Switch to light mode'; }
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', light ? '#FFFFFF' : '#0A0B14');
+  }
+  (function initTheme() {
+    let saved = 'dark';
+    try { saved = localStorage.getItem('cartoon-shuffler-theme') || 'dark'; } catch (e) {}
+    applyTheme(saved);
+  })();
+  el('theme-toggle').addEventListener('click', () => {
+    const light = !document.body.classList.contains('light-mode');
+    applyTheme(light ? 'light' : 'dark');
+    try { localStorage.setItem('cartoon-shuffler-theme', light ? 'light' : 'dark'); } catch (e) {}
+  });
+
   // ---------- Auto-links (Watchmode) status pill ----------
   function updateWmStatus() {
     const btn = el('wm-status');
@@ -1079,44 +1143,6 @@
   }
 
   // Store an exact link for ONE specific episode of a show, per service.
-  async function setEpisodeLink(show, episode, providers) {
-    const listShow = list.find((s) => s.tmdbId === show.tmdbId) || show;
-    if (!listShow.episodeLinks) listShow.episodeLinks = {};
-    const ek = epKey(show.tmdbId, episode.season_number, episode.episode_number);
-    if (!listShow.episodeLinks[ek]) listShow.episodeLinks[ek] = {};
-
-    const flatrate = (providers && providers.flatrate) ? providers.flatrate : [];
-    const opts = flatrate.length
-      ? flatrate.map((p, i) => (i + 1) + '. ' + p.provider_name +
-          (listShow.episodeLinks[ek][providerKey(p.provider_name)] ? ' ✅' : ''))
-      : ['1. Netflix', '2. Hulu', '3. Disney+', '4. Max', '5. Prime Video'];
-    const keys = flatrate.length
-      ? flatrate.map((p) => [providerKey(p.provider_name), p.provider_name])
-      : [['netflix','Netflix'],['hulu','Hulu'],['disney','Disney+'],['max','Max'],['prime','Prime Video']];
-
-    const choice = prompt(
-      'Exact link for this episode:\n"' + show.title + '" S' + episode.season_number + 'E' + episode.episode_number +
-      '\n\nWhich service is this link for? Type a number:\n' + opts.join('\n')
-    );
-    if (choice === null) return;
-    const idx = parseInt(choice.trim(), 10) - 1;
-    if (isNaN(idx) || idx < 0 || idx >= keys.length) return;
-    const [key, label] = keys[idx];
-
-    const url = prompt(
-      'Open this exact episode in ' + label + ', copy the URL from the address bar, and paste it here.\n\n' +
-      'On your phone that link will open the ' + label + ' app straight to this episode.'
-      , listShow.episodeLinks[ek][key] || '');
-    if (url === null) return;
-    const trimmed = url.trim();
-    if (trimmed === '') return;
-    if (trimmed === '-') { delete listShow.episodeLinks[ek][key]; }
-    else { listShow.episodeLinks[ek][key] = trimmed; }
-
-    await saveList();
-    renderNowPlaying(show, episode, providers, false);
-  }
-
   // ---------- History ----------
   async function addToHistory(show, episode) {
     history.unshift({
@@ -1471,6 +1497,12 @@
     if (!current || current !== slot) return; // a new shuffle replaced this card
     if (!found) { slot.innerHTML = ''; return; }
     if (document.getElementById('theater-root')) { slot.innerHTML = ''; return; } // already watching
+    // Click-free: if autoplay is on, just start playing it here. The button
+    // stays as a fallback if the browser blocks autoplay on the first video.
+    if (autoplay) {
+      startSitePlayback(show, episode, found.videoId);
+      return;
+    }
     renderYtButton(slot, show, episode, found.videoId);
   }
 
@@ -1538,67 +1570,6 @@
     if (b && b.getAttribute('data-counting') === '1') b.remove();
   }
 
-  function startPortal(show, episode, providerName, url) {
-    cancelPortal();
-    const np = el('np-content');
-    const banner = document.createElement('div');
-    banner.className = 'up-next-banner';
-    banner.id = 'portal-banner';
-    banner.setAttribute('data-counting', '1');
-    banner.innerHTML = '🌀 Portal to <strong>' + escapeHtml(providerName) + '</strong> in <span id="portal-count">5</span>…' +
-      ' <button class="btn btn-ghost btn-small" id="portal-cancel" style="margin-left:8px;">✕ Cancel</button>';
-    np.insertBefore(banner, np.firstChild);
-    banner.querySelector('#portal-cancel').addEventListener('click', cancelPortal);
-
-    // Resolve the exact deep link (episode → show → search) while we count down,
-    // so the portal lands on the same place the buttons do.
-    let resolvedUrl = url;
-    bestLinkFor(providerName, show, episode).then(function (u) { if (u) resolvedUrl = u; }).catch(function () {});
-
-    let count = 5;
-    portalTimer = setInterval(() => {
-      count -= 1;
-      const c = el('portal-count');
-      if (!c) { cancelPortal(); return; } // card was replaced
-      if (count > 0) { c.textContent = count; return; }
-      clearInterval(portalTimer);
-      portalTimer = null;
-      enterPortal(show, episode, providerName, resolvedUrl);
-    }, 1000);
-  }
-
-  function enterPortal(show, episode, providerName, url) {
-    const banner = el('portal-banner');
-    if (!banner) return;
-    banner.setAttribute('data-counting', '0');
-
-    // If this episode turned out to be playable right here, portal stays on-site.
-    const ytBtn = document.querySelector('#yt-slot .yt-play-btn');
-    if (ytBtn) { banner.remove(); ytBtn.click(); return; }
-
-    const win = window.open(url, '_blank');
-    if (win) {
-      banner.innerHTML = '🌀 Portaled to <strong>' + escapeHtml(providerName) + '</strong> ✨ — countdown running';
-      lastProviderName = providerName;
-      saveLastProvider();
-      startTimer(show.avgRuntimeMin || 22);
-      addToHistory(show, episode);
-      recordWatch(show.tmdbId);
-    } else {
-      // Browser blocked the auto-open — one tap finishes the jump.
-      banner.innerHTML = '<button class="yt-play-btn" id="portal-go" style="background: var(--accent, #7c5cff);">🌀 Tap to enter portal → ' + escapeHtml(providerName) + '</button>';
-      banner.querySelector('#portal-go').addEventListener('click', () => {
-        window.open(url, '_blank');
-        banner.innerHTML = '🌀 Portaled to <strong>' + escapeHtml(providerName) + '</strong> ✨ — countdown running';
-        lastProviderName = providerName;
-        saveLastProvider();
-        startTimer(show.avgRuntimeMin || 22);
-        addToHistory(show, episode);
-        recordWatch(show.tmdbId);
-      });
-    }
-  }
-
   // ---------- Shuffle / Now Playing ----------
   el('shuffle-btn').addEventListener('click', () => { resetTimer(); doShuffle(); });
 
@@ -1656,7 +1627,6 @@
     const flatrate = providers && providers.flatrate ? providers.flatrate : [];
 
     let providerHtml = '';
-    let anySearchOnly = false;
     if (flatrate.length) {
       const epk = epKey(show.tmdbId, episode.season_number, episode.episode_number);
       // Put services the user HAS first; pick a primary from those.
@@ -1707,9 +1677,15 @@
     }
 
     const banner = isUpNext ? '<div class="up-next-banner">▶ Up next</div>' : '';
+    const artSrc = (episode && episode.still_path) ? (STILL_BASE + episode.still_path)
+      : (show.posterPath ? IMG_BASE + show.posterPath : '');
+    const artHtml = artSrc
+      ? '<div class="np-art" style="background-image:url(\'' + artSrc + '\')"></div>'
+      : '';
 
     el('np-content').innerHTML =
       banner +
+      artHtml +
       '<div class="np-show-title">' + escapeHtml(show.title) + '</div>' +
       '<div class="np-ep-line">S' + episode.season_number + 'E' + episode.episode_number + ' · ' + escapeHtml(episode.name || '') + '</div>' +
       '<div class="yt-slot" id="yt-slot"></div>' +
