@@ -165,6 +165,9 @@
     border-radius: 999px; padding: 5px 11px; font-size: 0.72rem; cursor: pointer; font-weight: 600;
   }
   .wm-status.on { background: var(--accent-2); color: #06232a; border-color: var(--accent-2); }
+  .np-fallback { margin-top: 10px; min-height: 0; }
+  .np-handlink { font-size: 0.72rem; color: var(--text-dim); text-decoration: underline; opacity: 0.7; cursor: pointer; }
+  .np-handlink:hover { opacity: 1; }
 
   .now-playing {
     border-radius: 20px;
@@ -449,7 +452,7 @@
   // With a key, the app looks up each show by its TMDB id and fills in the real
   // Netflix/Hulu/Disney+ app deep links automatically — no pasting. You can also
   // set it at runtime with the "⚡ automatic links" button under a show.
-  const WATCHMODE_API_KEY = '';
+  const WATCHMODE_API_KEY = 'W7DD2EmvvHXn759SiAw0VHXjBQBfevVKtQNvCyFf';
   // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
   const WATCHMODE_BASE = 'https://api.watchmode.com/v1';
   let watchmodeKey = WATCHMODE_API_KEY;
@@ -734,10 +737,10 @@
   }
 
   // After a card renders, upgrade any search-only buttons to real deep links.
-  async function attachWatchmodeLinks(show, episode) {
-    if (!watchmodeKey) return;
+  async function attachWatchmodeLinks(show, episode, providers) {
     const root = el('np-content');
     if (!root) return;
+    if (!watchmodeKey) { renderEpFallback(show, episode, providers); return; }
     try {
       const results = await Promise.all([
         wmEpisodeLinks(show.tmdbId, episode.season_number, episode.episode_number, region),
@@ -759,6 +762,46 @@
     } catch (e) {
       console.warn('Watchmode lookup failed (links stay as search):', e.message);
     }
+    renderEpFallback(show, episode, providers);
+  }
+
+  // Quiet fallback: only shown if some service is still search-only after the
+  // auto lookup. Lets you hand-set that episode's link. Tucked at the bottom.
+  function renderEpFallback(show, episode, providers) {
+    const slot = el('np-fallback');
+    if (!slot) return;
+    const remaining = document.querySelectorAll('#np-content .provider-tag.search-only[data-runtime]').length;
+    if (remaining === 0) { slot.innerHTML = ''; return; }
+    slot.innerHTML =
+      '<a href="#" class="np-handlink" id="np-handlink">🔗 couldn\u2019t auto-find one — set this episode\u2019s link by hand</a>';
+    const link = el('np-handlink');
+    if (link) {
+      link.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        setEpisodeLink(show, episode, providers);
+      });
+    }
+  }
+
+  // Best available link for a service, resolving async sources when needed.
+  // Priority: manual episode → manual show → auto episode → auto title → search.
+  async function bestLinkFor(providerName, show, episode) {
+    const key = providerKey(providerName);
+    const listShow = list.find(function (s) { return s.tmdbId === show.tmdbId; }) || show;
+    const ek = epKey(show.tmdbId, episode.season_number, episode.episode_number);
+    if (listShow.episodeLinks && listShow.episodeLinks[ek] && listShow.episodeLinks[ek][key]) {
+      return listShow.episodeLinks[ek][key];
+    }
+    if (listShow.deepLinks && listShow.deepLinks[key]) return listShow.deepLinks[key];
+    if (watchmodeKey) {
+      try {
+        const epMap = await wmEpisodeLinks(show.tmdbId, episode.season_number, episode.episode_number, region);
+        if (epMap && epMap[key]) return epMap[key];
+        const tMap = await wmTitleLinks(show.tmdbId, region);
+        if (tMap && tMap[key]) return tMap[key];
+      } catch (e) { /* fall through to search */ }
+    }
+    return buildProviderLink(providerName, show.title, show, episode);
   }
 
   // ---------- TMDB calls ----------
@@ -1446,6 +1489,11 @@
     np.insertBefore(banner, np.firstChild);
     banner.querySelector('#portal-cancel').addEventListener('click', cancelPortal);
 
+    // Resolve the exact deep link (episode → show → search) while we count down,
+    // so the portal lands on the same place the buttons do.
+    let resolvedUrl = url;
+    bestLinkFor(providerName, show, episode).then(function (u) { if (u) resolvedUrl = u; }).catch(function () {});
+
     let count = 5;
     portalTimer = setInterval(() => {
       count -= 1;
@@ -1454,7 +1502,7 @@
       if (count > 0) { c.textContent = count; return; }
       clearInterval(portalTimer);
       portalTimer = null;
-      enterPortal(show, episode, providerName, url);
+      enterPortal(show, episode, providerName, resolvedUrl);
     }, 1000);
   }
 
@@ -1566,18 +1614,7 @@
     }
 
     const banner = isUpNext ? '<div class="up-next-banner">▶ Up next — tap a service below to keep going</div>' : '';
-    let hint = flatrate.length ? '<div class="np-hint">Tap a service to watch — your countdown starts then.</div>' : '';
-    if (anySearchOnly) {
-      const autoBtn = watchmodeKey
-        ? ''
-        : '<button class="btn btn-ghost btn-small" id="wm-setup-btn">⚡ Turn on automatic links</button> ';
-      const autoNote = watchmodeKey
-        ? '🔎 = still searching. If it stays 🔎, that service had no deep link for this title — the manual button below always works.'
-        : '🔎 = opens a search only (the app may land on its home screen). Turn on automatic links to fill these in for you, or set one by hand below.';
-      hint += '<div class="np-hint" style="opacity:.85">' + autoNote + '</div>' +
-        '<div style="margin-top:8px;">' + autoBtn +
-        '<button class="btn btn-ghost btn-small" id="set-ep-link-btn">🔗 Set this episode by hand</button></div>';
-    }
+    const hint = flatrate.length ? '<div class="np-hint">Tap a service to watch — your countdown starts then.</div>' : '';
 
     el('np-content').innerHTML =
       banner +
@@ -1586,6 +1623,7 @@
       hint +
       '<div class="yt-slot" id="yt-slot"></div>' +
       providerHtml +
+      '<div class="np-fallback" id="np-fallback"></div>' +
       '<div style="margin-top:12px;"><button class="btn btn-ghost btn-small" id="skip-btn">↻ Nah, spin again</button></div>';
 
     // Skip: doesn't count as watching, but won't come up again this visit.
@@ -1596,34 +1634,12 @@
       doShuffle();
     });
 
-    // Set an exact link for THIS specific episode (so the app lands on the episode).
-    const epLinkBtn = el('set-ep-link-btn');
-    if (epLinkBtn) {
-      epLinkBtn.addEventListener('click', () => setEpisodeLink(show, episode, providers));
-    }
-
     // If this episode exists on YouTube, offer to play it right here.
     attachYouTubeOption(show, episode);
 
-    // Auto-upgrade search-only buttons to real deep links (if a key is set).
-    attachWatchmodeLinks(show, episode);
-
-    // One-tap setup for automatic links when no key is configured yet.
-    const setupBtn = el('wm-setup-btn');
-    if (setupBtn) {
-      setupBtn.addEventListener('click', function () {
-        const k = prompt(
-          'Paste your free Watchmode API key to turn on automatic deep links.\n\n' +
-          'Get one (free, 2,500/month, no credit card) at:\napi.watchmode.com\n\n' +
-          'The app will then look up each show and fill in the real Netflix/Hulu/Disney+ links for you.'
-          , watchmodeKey || '');
-        if (k === null) return;
-        watchmodeKey = k.trim();
-        try { localStorage.setItem('cartoon-shuffler-watchmode-key', watchmodeKey); } catch (e) {}
-        updateWmStatus();
-        attachWatchmodeLinks(show, episode);
-      });
-    }
+    // Auto-upgrade search-only buttons to real deep links, then show a quiet
+    // hand-set fallback only for services that couldn't be resolved.
+    attachWatchmodeLinks(show, episode, providers);
 
     // Every provider tap starts the countdown for THIS episode's runtime.
     document.querySelectorAll('#np-content .provider-tag[data-runtime]').forEach((tagEl) => {
@@ -1758,7 +1774,7 @@
           }
           if (!pick && allowed.length) pick = allowed[0];
           if (pick) {
-            const url = buildProviderLink(pick.provider_name, show.title, show, episode);
+            const url = await bestLinkFor(pick.provider_name, show, episode);
             const win = window.open(url, '_blank');
             const banner = document.querySelector('#np-content .up-next-banner');
             if (banner) {
