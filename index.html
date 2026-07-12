@@ -149,6 +149,12 @@
     background: var(--accent-2); color: white; border: 2px solid var(--bg-elev); font-weight: 700; font-size: 0.85rem;
     display: flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1;
   }
+  .list-chip .link-btn {
+    position: absolute; top: -6px; left: -6px; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--bg-elev); border: 2px solid var(--accent-2); font-size: 0.8rem;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1; padding: 0;
+  }
+  .list-chip .link-btn.has-links { background: var(--accent-2); }
 
   /* Now Playing card */
   .region-row { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 16px; font-size: 0.8rem; color: var(--text-dim); }
@@ -585,7 +591,27 @@
     { match: /fubo/i, build: () => 'https://www.fubo.tv/welcome' },
     { match: /philo/i, build: () => 'https://www.philo.com/' },
   ];
-  function buildProviderLink(providerName, showTitle) {
+  // Normalize a provider name to a short key we can store exact links under.
+  function providerKey(providerName) {
+    const n = (providerName || '').toLowerCase();
+    if (/netflix/.test(n)) return 'netflix';
+    if (/\bhulu\b/.test(n)) return 'hulu';
+    if (/disney/.test(n)) return 'disney';
+    if (/\bmax\b|hbo/.test(n)) return 'max';
+    if (/amazon|prime video/.test(n)) return 'prime';
+    if (/paramount/.test(n)) return 'paramount';
+    if (/peacock/.test(n)) return 'peacock';
+    if (/apple tv/.test(n)) return 'apple';
+    if (/roku/.test(n)) return 'roku';
+    return n.replace(/[^a-z0-9]+/g, '') || 'other';
+  }
+  // If the show has an exact deep link saved for this service, use it.
+  // Otherwise fall back to the service's search page (previous behavior).
+  function buildProviderLink(providerName, showTitle, show) {
+    if (show && show.deepLinks) {
+      const exact = show.deepLinks[providerKey(providerName)];
+      if (exact) return exact;
+    }
     const rule = PROVIDER_LINK_RULES.find((r) => r.match.test(providerName));
     if (rule) return rule.build(showTitle);
     return `https://www.google.com/search?q=${encodeURIComponent('watch ' + showTitle + ' on ' + providerName)}`;
@@ -724,16 +750,66 @@
       const chip = document.createElement('div');
       chip.className = 'list-chip';
       const poster = show.posterPath ? IMG_BASE + show.posterPath : '';
+      const linkCount = show.deepLinks ? Object.keys(show.deepLinks).length : 0;
       chip.innerHTML =
         '<button class="remove-btn" data-remove="' + show.tmdbId + '">×</button>' +
+        '<button class="link-btn' + (linkCount ? ' has-links' : '') + '" data-link="' + show.tmdbId + '" title="Set exact links">🔗</button>' +
         '<img src="' + poster + '" alt="" onerror="this.style.visibility=\'hidden\'" />' +
         '<div class="chip-title">' + escapeHtml(show.title) + '</div>' +
-        '<div class="chip-meta">' + show.numberOfSeasons + ' szn</div>';
+        '<div class="chip-meta">' + show.numberOfSeasons + ' szn' + (linkCount ? ' · ' + linkCount + ' 🎯' : '') + '</div>';
       container.appendChild(chip);
     });
     container.querySelectorAll('[data-remove]').forEach((btn) => {
       btn.addEventListener('click', () => removeShow(parseInt(btn.getAttribute('data-remove'), 10)));
     });
+    container.querySelectorAll('[data-link]').forEach((btn) => {
+      btn.addEventListener('click', () => editDeepLinks(parseInt(btn.getAttribute('data-link'), 10)));
+    });
+  }
+
+  // Let the user paste an exact deep link for a show, per service.
+  // Saved on the show so that service's button jumps straight to the title.
+  async function editDeepLinks(tmdbId) {
+    const show = list.find((s) => s.tmdbId === tmdbId);
+    if (!show) return;
+    if (!show.deepLinks) show.deepLinks = {};
+
+    const services = [
+      ['netflix', 'Netflix'], ['hulu', 'Hulu'], ['disney', 'Disney+'],
+      ['max', 'Max / HBO'], ['prime', 'Prime Video'], ['paramount', 'Paramount+'],
+      ['peacock', 'Peacock'], ['apple', 'Apple TV'],
+    ];
+    const current = services
+      .filter(([k]) => show.deepLinks[k])
+      .map(([k, label]) => label + ': ' + show.deepLinks[k]);
+
+    const menu = services.map(([k, label], i) =>
+      (i + 1) + '. ' + label + (show.deepLinks[k] ? ' ✅' : '')).join('\n');
+
+    const choice = prompt(
+      'Exact links for "' + show.title + '"\n' +
+      (current.length ? '\nAlready set:\n' + current.join('\n') + '\n' : '') +
+      '\nType a number to set/replace its link:\n' + menu +
+      '\n\n(To clear one, set its link to a single dash "-")'
+    );
+    if (choice === null) return;
+    const idx = parseInt(choice.trim(), 10) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= services.length) return;
+
+    const [key, label] = services[idx];
+    const url = prompt(
+      'Paste the exact ' + label + ' URL for "' + show.title + '".\n\n' +
+      'Open the show in ' + label + ', copy the address bar URL, and paste it here.\n' +
+      'On a phone, that same link opens the ' + label + ' app to this title.'
+      , show.deepLinks[key] || '');
+    if (url === null) return;
+    const trimmed = url.trim();
+    if (trimmed === '' ) return;
+    if (trimmed === '-') { delete show.deepLinks[key]; }
+    else { show.deepLinks[key] = trimmed; }
+
+    await saveList();
+    renderList();
   }
 
   // ---------- History ----------
@@ -1268,8 +1344,10 @@
     if (flatrate.length) {
       providerHtml = '<div class="providers">' +
         flatrate.map((p) => {
-          const url = buildProviderLink(p.provider_name, show.title);
-          return '<a class="provider-tag" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '">' + escapeHtml(p.provider_name) + '</a>';
+          const url = buildProviderLink(p.provider_name, show.title, show);
+          const hasExact = !!(show.deepLinks && show.deepLinks[providerKey(p.provider_name)]);
+          const mark = hasExact ? ' 🎯' : '';
+          return '<a class="provider-tag" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '">' + escapeHtml(p.provider_name) + mark + '</a>';
         }).join('') +
         '</div>';
     } else {
@@ -1323,7 +1401,7 @@
         }
         if (!pick) pick = allowed[0];
         startPortal(show, episode, pick.provider_name,
-          buildProviderLink(pick.provider_name, show.title));
+          buildProviderLink(pick.provider_name, show.title, show));
       }
     }
   }
@@ -1432,7 +1510,7 @@
           }
           if (!pick && allowed.length) pick = allowed[0];
           if (pick) {
-            const url = buildProviderLink(pick.provider_name, show.title);
+            const url = buildProviderLink(pick.provider_name, show.title, show);
             const win = window.open(url, '_blank');
             const banner = document.querySelector('#np-content .up-next-banner');
             if (banner) {
