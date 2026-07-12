@@ -396,13 +396,6 @@
         </span>
         <span>Autoplay — when the countdown ends, queue the next episode and start its timer automatically</span>
       </label>
-      <label class="autoplay-row">
-        <span class="switch">
-          <input type="checkbox" id="portal-toggle" />
-          <span class="slider"></span>
-        </span>
-        <span>Auto-portal — after a shuffle, count down 5 seconds and open the streaming service automatically</span>
-      </label>
     </div>
     <div class="error-msg" id="shuffle-error"></div>
   </div>
@@ -444,7 +437,7 @@
   // ▼▼▼ YOUTUBE SETUP — paste your YouTube API key between the quotes below ▼▼▼
   // Without a key, the app works exactly as before (streaming buttons only).
   // With a key, episodes that exist on YouTube get a "Play on this website" button.
-  const YT_API_KEY = '';
+  const YT_API_KEY = 'AIzaSyCHD0JsouP06oGE2Sdam24TSpDw0u0';
   // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
 
   // ▼▼▼ AUTOMATIC DEEP LINKS (Watchmode) — paste a free key to auto-resolve ▼▼▼
@@ -1158,6 +1151,11 @@
           }
           if (title.indexOf('full episode') !== -1 || title.indexOf('full ep') !== -1) score += 2;
           if (title.indexOf(showStart) !== -1 || desc.indexOf(showStart) !== -1) score += 1;
+          // Strongly prefer official / network channels over random reuploads.
+          const chan = ((v.snippet && v.snippet.channelTitle) || '').toLowerCase();
+          const OFFICIAL = ['disney', 'cartoon network', 'nickelodeon', 'nick', 'pbs',
+            'warner', 'hbo', 'netflix', 'nbc', 'cbs', 'boomerang', 'adult swim', 'official'];
+          if (OFFICIAL.some((c) => chan.indexOf(c) !== -1) || chan.indexOf(showStart) !== -1) score += 4;
           // Require real evidence it's THIS episode, not just any video of the show.
           if (!epEvidence) return;
           if (score > bestScore) { bestScore = score; best = v; }
@@ -1654,20 +1652,6 @@
       });
     });
 
-    // Signed-in users get the auto-portal after a manual shuffle — but only
-    // to services this profile actually has an account on.
-    if (portalEnabled && !isUpNext && account && account.name && flatrate.length) {
-      const allowed = flatrate.filter((p) => hasServiceFor(p.provider_name));
-      if (allowed.length) {
-        let pick = null;
-        if (lastProviderName && lastProviderName !== WEBSITE_PROVIDER) {
-          pick = allowed.find((p) => p.provider_name === lastProviderName) || null;
-        }
-        if (!pick) pick = allowed[0];
-        startPortal(show, episode, pick.provider_name,
-          buildProviderLink(pick.provider_name, show.title, show, episode));
-      }
-    }
   }
 
   // Track distinct shows watched (used for the account nudge).
@@ -1794,13 +1778,6 @@
   el('autoplay-toggle').addEventListener('change', (e) => {
     autoplay = e.target.checked;
     saveAutoplay();
-  });
-
-  // ---------- Auto-portal toggle ----------
-  el('portal-toggle').addEventListener('change', (e) => {
-    portalEnabled = e.target.checked;
-    try { localStorage.setItem('cartoon-shuffler-portal', portalEnabled ? '1' : '0'); } catch (err) {}
-    if (!portalEnabled) cancelPortal(); // stop a countdown that's mid-flight
   });
 
   // ---------- Daily verse (KJV, rotates by day of year) ----------
@@ -2221,7 +2198,6 @@
     renderGreeting();
     updateWmStatus();
     el('autoplay-toggle').checked = autoplay;
-    el('portal-toggle').checked = portalEnabled;
     renderResumeChip();
     // If they arrived via a backup-email link, log them straight in.
     await maybeRestoreFromLink();
