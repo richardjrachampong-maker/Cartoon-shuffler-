@@ -669,10 +669,14 @@
   const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent);
   const isAndroid = /Android/.test(navigator.userAgent);
   function pickDeepUrl(src) {
-    // Prefer the native app deep link for this device, else the web link.
-    if (isIOS && src.ios_url) return src.ios_url;
-    if (isAndroid && src.android_url) return src.android_url;
-    return src.web_url || src.ios_url || src.android_url || null;
+    // Prefer the real web page (least likely to 404). Fall back to app deep
+    // links only if there's no web URL. Reject anything that isn't http(s).
+    const candidates = [src.web_url, src.ios_url, src.android_url];
+    for (let i = 0; i < candidates.length; i++) {
+      const u = candidates[i];
+      if (u && /^https?:\/\//i.test(u)) return u;
+    }
+    return null;
   }
 
   async function wmFetch(path) {
@@ -761,8 +765,8 @@
     return map;
   }
 
-  // After a card renders, upgrade buttons to the exact-episode link when we can,
-  // and search-only buttons to at least a show-level link.
+  // Upgrade buttons to real deep links from Watchmode (web links preferred so
+  // they don't 404). Episode link beats show link; search stays as a fallback.
   async function attachWatchmodeLinks(show, episode, providers) {
     const root = el('np-content');
     if (!root) return;
@@ -774,25 +778,22 @@
       ]);
       const epMap = results[0], titleMap = results[1];
       const stillHere = el('np-content');
-      if (!stillHere || stillHere !== root) return; // a new shuffle replaced this card
+      if (!stillHere || stillHere !== root) return;
       root.querySelectorAll('.provider-tag.needs-ep[data-runtime]').forEach(function (tag) {
         const name = tag.textContent.replace(/\s*(🎯ep|🎯|🔎)\s*$/u, '').trim();
         const key = providerKey(name);
         if (epMap && epMap[key]) {
-          // Exact episode — this is the one that stops Hulu from resuming.
           tag.setAttribute('href', epMap[key]);
           tag.classList.remove('search-only', 'needs-ep');
           tag.textContent = name + ' 🎯ep';
         } else if (tag.classList.contains('search-only') && titleMap && titleMap[key]) {
-          // No episode link, but we can at least land on the show.
           tag.setAttribute('href', titleMap[key]);
           tag.classList.remove('search-only');
           tag.textContent = name + ' 🎯';
         }
-        // Otherwise leave it (show-level 🎯 or search 🔎) — still resumes.
       });
     } catch (e) {
-      console.warn('Watchmode lookup failed (links stay as-is):', e.message);
+      console.warn('Watchmode lookup failed (links stay as search):', e.message);
     }
     renderEpFallback(show, episode, providers);
   }
@@ -815,10 +816,7 @@
     }
   }
 
-  // Best available link for a service, resolving async sources when needed.
-  // Priority: manual episode → AUTO episode → manual show → auto title → search.
-  // (Episode links always beat show-level links, so we land on the exact episode
-  // instead of letting the app resume the last-watched one.)
+  // Link for autoplay/openers. Prefers exact-episode, then show, then search.
   async function bestLinkFor(providerName, show, episode) {
     const key = providerKey(providerName);
     const listShow = list.find(function (s) { return s.tmdbId === show.tmdbId; }) || show;
@@ -830,14 +828,14 @@
       try {
         const epMap = await wmEpisodeLinks(show.tmdbId, episode.season_number, episode.episode_number, region);
         if (epMap && epMap[key]) return epMap[key];
-      } catch (e) { /* fall through */ }
+      } catch (e) {}
     }
     if (listShow.deepLinks && listShow.deepLinks[key]) return listShow.deepLinks[key];
     if (watchmodeKey) {
       try {
         const tMap = await wmTitleLinks(show.tmdbId, region);
         if (tMap && tMap[key]) return tMap[key];
-      } catch (e) { /* fall through to search */ }
+      } catch (e) {}
     }
     return buildProviderLink(providerName, show.title, show, episode);
   }
@@ -905,13 +903,8 @@
   function updateWmStatus() {
     const btn = el('wm-status');
     if (!btn) return;
-    if (watchmodeKey) {
-      btn.textContent = '⚡ auto-links: on';
-      btn.classList.add('on');
-    } else {
-      btn.textContent = '⚡ auto-links: off';
-      btn.classList.remove('on');
-    }
+    if (watchmodeKey) { btn.textContent = '⚡ auto-links: on'; btn.classList.add('on'); }
+    else { btn.textContent = '⚡ auto-links: off'; btn.classList.remove('on'); }
   }
   el('wm-status').addEventListener('click', () => {
     const code = prompt('Enter your access code to view or change the API key:');
