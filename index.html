@@ -742,7 +742,8 @@
     return map;
   }
 
-  // After a card renders, upgrade any search-only buttons to real deep links.
+  // After a card renders, upgrade buttons to the exact-episode link when we can,
+  // and search-only buttons to at least a show-level link.
   async function attachWatchmodeLinks(show, episode, providers) {
     const root = el('np-content');
     if (!root) return;
@@ -755,31 +756,37 @@
       const epMap = results[0], titleMap = results[1];
       const stillHere = el('np-content');
       if (!stillHere || stillHere !== root) return; // a new shuffle replaced this card
-      root.querySelectorAll('.provider-tag.search-only[data-runtime]').forEach(function (tag) {
+      root.querySelectorAll('.provider-tag.needs-ep[data-runtime]').forEach(function (tag) {
         const name = tag.textContent.replace(/\s*(🎯ep|🎯|🔎)\s*$/u, '').trim();
         const key = providerKey(name);
-        const url = (epMap && epMap[key]) || (titleMap && titleMap[key]);
-        if (url) {
-          tag.setAttribute('href', url);
+        if (epMap && epMap[key]) {
+          // Exact episode — this is the one that stops Hulu from resuming.
+          tag.setAttribute('href', epMap[key]);
+          tag.classList.remove('search-only', 'needs-ep');
+          tag.textContent = name + ' 🎯ep';
+        } else if (tag.classList.contains('search-only') && titleMap && titleMap[key]) {
+          // No episode link, but we can at least land on the show.
+          tag.setAttribute('href', titleMap[key]);
           tag.classList.remove('search-only');
-          tag.textContent = name + (epMap && epMap[key] ? ' 🎯ep' : ' 🎯');
+          tag.textContent = name + ' 🎯';
         }
+        // Otherwise leave it (show-level 🎯 or search 🔎) — still resumes.
       });
     } catch (e) {
-      console.warn('Watchmode lookup failed (links stay as search):', e.message);
+      console.warn('Watchmode lookup failed (links stay as-is):', e.message);
     }
     renderEpFallback(show, episode, providers);
   }
 
-  // Quiet fallback: only shown if some service is still search-only after the
-  // auto lookup. Lets you hand-set that episode's link. Tucked at the bottom.
+  // Quiet fallback: shown only if a service couldn't get an EXACT-episode link
+  // (so it would resume). Lets you hand-set this episode's link. Tucked at bottom.
   function renderEpFallback(show, episode, providers) {
     const slot = el('np-fallback');
     if (!slot) return;
-    const remaining = document.querySelectorAll('#np-content .provider-tag.search-only[data-runtime]').length;
+    const remaining = document.querySelectorAll('#np-content .provider-tag.needs-ep[data-runtime]').length;
     if (remaining === 0) { slot.innerHTML = ''; return; }
     slot.innerHTML =
-      '<a href="#" class="np-handlink" id="np-handlink">🔗 couldn\u2019t auto-find one — set this episode\u2019s link by hand</a>';
+      '<a href="#" class="np-handlink" id="np-handlink">🎯 want the exact episode? set this one by hand</a>';
     const link = el('np-handlink');
     if (link) {
       link.addEventListener('click', function (ev) {
@@ -790,7 +797,9 @@
   }
 
   // Best available link for a service, resolving async sources when needed.
-  // Priority: manual episode → manual show → auto episode → auto title → search.
+  // Priority: manual episode → AUTO episode → manual show → auto title → search.
+  // (Episode links always beat show-level links, so we land on the exact episode
+  // instead of letting the app resume the last-watched one.)
   async function bestLinkFor(providerName, show, episode) {
     const key = providerKey(providerName);
     const listShow = list.find(function (s) { return s.tmdbId === show.tmdbId; }) || show;
@@ -798,11 +807,15 @@
     if (listShow.episodeLinks && listShow.episodeLinks[ek] && listShow.episodeLinks[ek][key]) {
       return listShow.episodeLinks[ek][key];
     }
-    if (listShow.deepLinks && listShow.deepLinks[key]) return listShow.deepLinks[key];
     if (watchmodeKey) {
       try {
         const epMap = await wmEpisodeLinks(show.tmdbId, episode.season_number, episode.episode_number, region);
         if (epMap && epMap[key]) return epMap[key];
+      } catch (e) { /* fall through */ }
+    }
+    if (listShow.deepLinks && listShow.deepLinks[key]) return listShow.deepLinks[key];
+    if (watchmodeKey) {
+      try {
         const tMap = await wmTitleLinks(show.tmdbId, region);
         if (tMap && tMap[key]) return tMap[key];
       } catch (e) { /* fall through to search */ }
@@ -1626,10 +1639,17 @@
           const key = providerKey(p.provider_name);
           const epMap = show.episodeLinks && show.episodeLinks[epKey(show.tmdbId, episode.season_number, episode.episode_number)];
           const hasEpExact = !!(epMap && epMap[key]);
-          const hasExact = hasEpExact || !!(show.deepLinks && show.deepLinks[key]);
-          if (!hasExact) anySearchOnly = true;
-          const mark = hasEpExact ? ' 🎯ep' : (hasExact ? ' 🎯' : ' 🔎');
-          return '<a class="provider-tag' + (hasExact ? '' : ' search-only') + '" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '">' + escapeHtml(p.provider_name) + mark + '</a>';
+          const hasShowManual = !!(show.deepLinks && show.deepLinks[key]);
+          // Episode-exact = locked. Everything else stays open to an episode upgrade.
+          let cls = 'provider-tag';
+          let mark;
+          if (hasEpExact) { mark = ' 🎯ep'; }
+          else {
+            cls += ' needs-ep';
+            if (hasShowManual) { mark = ' 🎯'; }
+            else { cls += ' search-only'; mark = ' 🔎'; anySearchOnly = true; }
+          }
+          return '<a class="' + cls + '" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '">' + escapeHtml(p.provider_name) + mark + '</a>';
         }).join('') +
         '</div>';
     } else {
