@@ -75,6 +75,40 @@
   }
   body.light-mode .theme-toggle-corner { box-shadow: 0 4px 14px rgba(33,64,92,0.16); }
   .theme-toggle-corner:active { transform: scale(0.94); }
+  .corner-gear {
+    position: fixed; top: 14px; right: 14px; z-index: 60;
+    width: 42px; height: 42px; border-radius: 50%;
+    background: var(--bg-elev-2); border: 1px solid var(--border); color: var(--text);
+    font-size: 1.15rem; cursor: pointer; line-height: 1;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+  }
+  body.light-mode .corner-gear { box-shadow: 0 4px 14px rgba(33,64,92,0.16); }
+  .corner-gear:active { transform: scale(0.94) rotate(30deg); }
+  .settings-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 70; }
+  .settings-drawer {
+    position: fixed; top: 0; right: 0; height: 100%; width: 320px; max-width: 86vw;
+    background: var(--bg-elev); border-left: 1px solid var(--border);
+    z-index: 80; transform: translateX(105%); transition: transform 0.25s ease;
+    box-shadow: -10px 0 40px rgba(0,0,0,0.4); display: flex; flex-direction: column;
+  }
+  .settings-drawer.open { transform: translateX(0); }
+  .settings-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 20px; border-bottom: 1px solid var(--border);
+    font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.1rem;
+  }
+  .settings-close { background: none; border: none; color: var(--text); font-size: 1.2rem; cursor: pointer; }
+  .settings-body { padding: 18px 20px; overflow-y: auto; }
+  .settings-section { margin-bottom: 22px; }
+  .settings-section h3 {
+    font-family: 'Sora', sans-serif; font-size: 0.72rem; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim);
+    margin: 0 0 10px;
+  }
+  .settings-section .btn, .settings-section select { width: 100%; margin-bottom: 8px; }
+  .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; font-size: 0.9rem; }
+  .settings-who { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 12px; word-break: break-all; }
   body {
     margin: 0;
     background: var(--bg);
@@ -403,17 +437,26 @@
 </style>
 </head>
 <body>
-<button id="theme-toggle" class="theme-toggle-corner" aria-label="Switch light or dark mode">☀️</button>
+<button id="settings-open" class="corner-gear" aria-label="Open settings">⚙️</button>
+<div id="settings-overlay" class="settings-overlay" style="display:none;"></div>
+<aside id="settings-drawer" class="settings-drawer" aria-label="Settings">
+  <div class="settings-head">
+    <span>Settings</span>
+    <button id="settings-close" class="settings-close" aria-label="Close settings">✕</button>
+  </div>
+  <div class="settings-body" id="settings-body"></div>
+</aside>
 <div class="wrap">
   <header>
     <h1>📺 Show Shuffler</h1>
     <p>Add shows you can watch, hit shuffle, land on a random episode.</p>
     <p id="greeting" style="display:none; color: var(--teal); font-weight:600; font-size:0.85rem; margin-top:4px;"></p>
-    <p id="account-tools" style="display:none; margin-top:6px;">
-      <button class="btn btn-ghost btn-small" id="profiles-btn">👤 Profiles</button>
-      <button class="btn btn-ghost btn-small" id="services-btn">📺 My services</button>
-      <button class="btn btn-ghost btn-small" id="transfer-btn">📤 Move / back up my account</button>
-      <button class="btn btn-ghost btn-small" id="fb-signout-btn" style="display:none;">🚪 Sign out</button>
+    <p id="account-tools" style="display:none;">
+      <button class="btn btn-ghost btn-small" id="services-btn" style="display:none;"></button>
+      <button class="btn btn-ghost btn-small" id="profiles-btn" style="display:none;"></button>
+      <button class="btn btn-ghost btn-small" id="transfer-btn" style="display:none;"></button>
+      <button class="btn btn-ghost btn-small" id="fb-signout-btn" style="display:none;"></button>
+      <button class="btn btn-ghost btn-small" id="fb-changepw-btn" style="display:none;"></button>
     </p>
   </header>
 
@@ -544,10 +587,12 @@
   // public — Firebase security is enforced by rules, not by hiding the config.
   // Until this is filled in, the app keeps using on-device accounts.
   const FIREBASE_CONFIG = {
-    apiKey: "",
-    authDomain: "",
-    projectId: "",
-    appId: ""
+    apiKey: "AIzaSyAUqwvLqrVIXvA8Szwo0LG4x-5_BGL8cbw",
+    authDomain: "show-shuffler.firebaseapp.com",
+    projectId: "show-shuffler",
+    storageBucket: "show-shuffler.firebasestorage.app",
+    messagingSenderId: "834122438804",
+    appId: "1:834122438804:web:7cacdc970fd5e3508b3c81"
   };
   // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
   let fbEnabled = false, fbAuth = null, fbDb = null, fbUser = null, fbSaveTimer = null;
@@ -570,6 +615,7 @@
     fbSaveTimer = setTimeout(() => {
       const data = {
         name: account.name || null,
+        username: account.username || null,
         email: account.email || fbUser.email || null,
         list: list, history: history.slice(0, 10), recent: recent.slice(-500),
         services: account.services || null, updatedAt: Date.now(),
@@ -1014,11 +1060,10 @@
   });
 
   // ---------- Light / dark theme ----------
+  function isLight() { return document.body.classList.contains('light-mode'); }
   function applyTheme(mode) {
     const light = mode === 'light';
     document.body.classList.toggle('light-mode', light);
-    const btn = el('theme-toggle');
-    if (btn) { btn.textContent = light ? '🌙' : '☀️'; btn.title = light ? 'Switch to dark mode' : 'Switch to light mode'; }
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', light ? '#FFFFFF' : '#0A0B14');
   }
@@ -1027,11 +1072,84 @@
     try { saved = localStorage.getItem('cartoon-shuffler-theme') || 'dark'; } catch (e) {}
     applyTheme(saved);
   })();
-  el('theme-toggle').addEventListener('click', () => {
-    const light = !document.body.classList.contains('light-mode');
+  function toggleTheme() {
+    const light = !isLight();
     applyTheme(light ? 'light' : 'dark');
     try { localStorage.setItem('cartoon-shuffler-theme', light ? 'light' : 'dark'); } catch (e) {}
-  });
+  }
+
+  // ---------- Settings drawer ----------
+  function openSettings() {
+    renderSettings();
+    el('settings-overlay').style.display = 'block';
+    el('settings-drawer').classList.add('open');
+  }
+  function closeSettings() {
+    el('settings-overlay').style.display = 'none';
+    el('settings-drawer').classList.remove('open');
+  }
+  function renderSettings() {
+    const signedIn = fbEnabled && fbUser;
+    const who = signedIn ? (fbUser.email || account.name || 'Signed in') : null;
+    let html = '';
+
+    // Account
+    html += '<div class="settings-section"><h3>Account</h3>';
+    if (signedIn) {
+      html += '<div class="settings-who">Signed in as ' + escapeHtml(who) + '</div>';
+      html += '<button class="btn btn-ghost btn-small" id="set-changepw">🔑 Change password</button>';
+      html += '<button class="btn btn-ghost btn-small" id="set-signout">🚪 Log out</button>';
+    } else if (fbEnabled) {
+      html += '<button class="btn btn-small" id="set-login">Log in</button>';
+      html += '<button class="btn btn-ghost btn-small" id="set-signup">Sign up</button>';
+    } else {
+      html += '<div class="settings-who">Cloud accounts aren\'t set up yet.</div>';
+    }
+    html += '</div>';
+
+    // Appearance
+    html += '<div class="settings-section"><h3>Appearance</h3>' +
+      '<button class="btn btn-ghost btn-small" id="set-theme">' + (isLight() ? '🌙 Switch to dark' : '☀️ Switch to light') + '</button></div>';
+
+    // Region
+    html += '<div class="settings-section"><h3>Region</h3>' +
+      '<select id="set-region">' +
+      ['US:United States', 'GB:United Kingdom', 'CA:Canada', 'AU:Australia'].map(function (o) {
+        const parts = o.split(':');
+        return '<option value="' + parts[0] + '"' + (region === parts[0] ? ' selected' : '') + '>' + parts[1] + '</option>';
+      }).join('') +
+      '</select></div>';
+
+    // Streaming services
+    html += '<div class="settings-section"><h3>Streaming</h3>' +
+      '<button class="btn btn-ghost btn-small" id="set-services">📺 My services</button></div>';
+
+    el('settings-body').innerHTML = html;
+
+    const bind = (id, fn) => { const b = el(id); if (b) b.addEventListener('click', fn); };
+    bind('set-changepw', sendPasswordChangeEmail);
+    bind('set-signout', async () => { try { await fbAuth.signOut(); } catch (e) {} location.reload(); });
+    bind('set-login', () => { closeSettings(); el('account-bubble').style.display = 'block'; showAuthForm('signin'); });
+    bind('set-signup', () => { closeSettings(); el('account-bubble').style.display = 'block'; showAuthForm('signup'); });
+    bind('set-theme', () => { toggleTheme(); renderSettings(); });
+    bind('set-services', () => { closeSettings(); showServicesDialog(); });
+    const rsel = el('set-region');
+    if (rsel) rsel.addEventListener('change', (e) => {
+      region = e.target.value; saveRegion();
+      const top = el('region-select'); if (top) top.value = region;
+    });
+  }
+  async function sendPasswordChangeEmail() {
+    const email = (fbUser && fbUser.email) || account.email;
+    if (!email) { alert('No email on file for this account.'); return; }
+    try {
+      await fbAuth.sendPasswordResetEmail(email);
+      alert('We sent a password-reset link to ' + email + '. Open it to set a new password.');
+    } catch (e) { alert('Couldn\'t send the reset email — please try again.'); }
+  }
+  el('settings-open').addEventListener('click', openSettings);
+  el('settings-close').addEventListener('click', closeSettings);
+  el('settings-overlay').addEventListener('click', closeSettings);
 
   // ---------- Auto-links (Watchmode) status pill ----------
   function updateWmStatus() {
@@ -2040,22 +2158,27 @@
       fbUser = null;
       location.reload();
     });
+    const cp = el('fb-changepw-btn');
+    if (cp) cp.addEventListener('click', async () => {
+      const email = (fbUser && fbUser.email) || account.email;
+      if (!email) { alert('No email on file for this account.'); return; }
+      try {
+        await fbAuth.sendPasswordResetEmail(email);
+        alert('We sent a password-reset link to ' + email + '. Check your inbox to set a new password.');
+      } catch (e) { alert('Couldn\'t send the reset email — please try again.'); }
+    });
   }
 
   // ---------- Account bubble ----------
   function renderGreeting() {
     const g = el('greeting');
-    const soBtn = el('fb-signout-btn');
-    if (soBtn) soBtn.style.display = (fbEnabled && fbUser) ? 'inline-block' : 'none';
-    if (account && account.name) {
+    el('account-tools').style.display = 'none';
+    const fr = el('footer-restore'); if (fr) fr.style.display = 'none';
+    if (account && account.name && (!fbEnabled || fbUser)) {
       g.textContent = '👋 Welcome back, ' + account.name;
       g.style.display = 'block';
-      el('account-tools').style.display = 'block';
-      el('footer-restore').style.display = 'none';
     } else {
       g.style.display = 'none';
-      el('account-tools').style.display = 'none';
-      el('footer-restore').style.display = 'inline';
     }
   }
   function showAccountBubble() {
@@ -2094,34 +2217,71 @@
   function showAuthForm(mode) {
     const signup = mode === 'signup';
     el('bubble-inner').innerHTML =
-      '<div class="bubble-title">' + (signup ? 'Create your account' : 'Sign in') + '</div>' +
-      '<input type="email" id="fb-email" placeholder="Email" autocomplete="email" />' +
+      '<div class="bubble-title">' + (signup ? 'Create your account' : 'Log in') + '</div>' +
+      (signup ? '<input type="text" id="fb-username" placeholder="Username (optional)" autocomplete="username" />' : '') +
+      '<input type="text" id="fb-id" placeholder="' + (signup ? 'Email' : 'Email or username') + '" autocomplete="' + (signup ? 'email' : 'username') + '" />' +
       '<input type="password" id="fb-pw" placeholder="Password" autocomplete="' + (signup ? 'new-password' : 'current-password') + '" />' +
       '<div class="error-msg" id="fb-error" style="display:none; margin-top:6px;"></div>' +
       '<div class="bubble-actions">' +
-        '<button class="btn btn-small" id="fb-go">' + (signup ? 'Create account' : 'Sign in') + '</button>' +
-        '<button class="btn btn-ghost btn-small" id="fb-switch">' + (signup ? 'I already have an account' : 'Create an account instead') + '</button>' +
+        '<button class="btn btn-small" id="fb-go">' + (signup ? 'Create account' : 'Log in') + '</button>' +
+        (signup ? '' : '<button class="btn btn-ghost btn-small" id="fb-forgot">Forgot password?</button>') +
+        '<button class="btn btn-ghost btn-small" id="fb-switch">' + (signup ? 'I already have an account' : 'Create an account') + '</button>' +
       '</div>' +
-      '<div class="bubble-fineprint">Your shows sync securely to the cloud and to any device you sign in on.</div>';
-    el('fb-email').focus();
+      '<div class="bubble-fineprint">Your shows sync securely to the cloud and to any device you log in on.</div>';
+    el('fb-id').focus();
     el('fb-switch').addEventListener('click', () => showAuthForm(signup ? 'signin' : 'signup'));
+    const err = el('fb-error');
+    const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
+    const ok = (m) => { err.style.color = 'var(--teal)'; err.textContent = m; err.style.display = 'block'; };
+
+    if (!signup) {
+      el('fb-forgot').addEventListener('click', async () => {
+        const idField = el('fb-id').value.trim();
+        if (!idField) { fail('Enter your email or username first, then tap Forgot password.'); return; }
+        try {
+          const email = await fbResolveEmail(idField);
+          await fbAuth.sendPasswordResetEmail(email);
+          ok('Password reset email sent — check your inbox.');
+        } catch (e) { fail(fbErrorText(e)); }
+      });
+    }
+
     el('fb-go').addEventListener('click', async () => {
-      const email = el('fb-email').value.trim();
+      const idField = el('fb-id').value.trim();
       const pw = el('fb-pw').value;
-      const err = el('fb-error');
-      const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
-      if (!email || !pw) { fail('Enter your email and password.'); return; }
+      const username = signup && el('fb-username') ? el('fb-username').value.trim() : '';
+      if (!idField || !pw) { fail('Enter your ' + (signup ? 'email' : 'email/username') + ' and password.'); return; }
       if (signup && pw.length < 6) { fail('Password must be at least 6 characters.'); return; }
       el('fb-go').disabled = true;
       try {
-        if (signup) await fbAuth.createUserWithEmailAndPassword(email, pw);
-        else await fbAuth.signInWithEmailAndPassword(email, pw);
+        if (signup) {
+          if (username) {
+            const taken = await fbDb.collection('usernames').doc(username.toLowerCase()).get();
+            if (taken.exists) { el('fb-go').disabled = false; fail('That username is taken.'); return; }
+          }
+          const cred = await fbAuth.createUserWithEmailAndPassword(idField, pw);
+          if (username) {
+            await fbDb.collection('usernames').doc(username.toLowerCase()).set({ email: idField, uid: cred.user.uid });
+            account.username = username;
+          }
+          fbQueueSave();
+        } else {
+          const email = await fbResolveEmail(idField);
+          await fbAuth.signInWithEmailAndPassword(email, pw);
+        }
         el('account-bubble').style.display = 'none';
       } catch (e) {
         el('fb-go').disabled = false;
         fail(fbErrorText(e));
       }
     });
+  }
+  // Turn a username into its email (for login); pass emails straight through.
+  async function fbResolveEmail(idField) {
+    if (idField.indexOf('@') !== -1) return idField;
+    const doc = await fbDb.collection('usernames').doc(idField.toLowerCase()).get();
+    if (doc.exists && doc.data().email) return doc.data().email;
+    throw { code: 'auth/user-not-found' };
   }
   function fbErrorText(e) {
     const c = (e && e.code) || '';
@@ -2141,6 +2301,7 @@
     try { data = await fbLoadUserData(user.uid); } catch (e) {}
     if (data) {
       account.name = data.name || (user.email ? user.email.split('@')[0] : 'You');
+      account.username = data.username || account.username || null;
       account.email = data.email || user.email || null;
       if (Array.isArray(data.list)) list = data.list;
       if (Array.isArray(data.history)) history = data.history;
