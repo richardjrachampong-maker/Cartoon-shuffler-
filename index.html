@@ -155,6 +155,7 @@
     display: flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1; padding: 0;
   }
   .list-chip .link-btn.has-links { background: var(--accent-2); }
+  .provider-tag.search-only { opacity: 0.72; border-style: dashed; }
 
   /* Now Playing card */
   .region-row { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 16px; font-size: 0.8rem; color: var(--text-dim); }
@@ -605,13 +606,15 @@
     if (/roku/.test(n)) return 'roku';
     return n.replace(/[^a-z0-9]+/g, '') || 'other';
   }
-  // If the show has an exact deep link saved for this service, use it.
-  // Otherwise fall back to the service's search page (previous behavior).
-  function buildProviderLink(providerName, showTitle, show) {
-    if (show && show.deepLinks) {
-      const exact = show.deepLinks[providerKey(providerName)];
-      if (exact) return exact;
+  // Link priority: exact link for THIS episode → exact link for the show → search page.
+  function buildProviderLink(providerName, showTitle, show, episode) {
+    const key = providerKey(providerName);
+    if (show && episode && show.episodeLinks) {
+      const ek = epKey(show.tmdbId, episode.season_number, episode.episode_number);
+      const epMap = show.episodeLinks[ek];
+      if (epMap && epMap[key]) return epMap[key];
     }
+    if (show && show.deepLinks && show.deepLinks[key]) return show.deepLinks[key];
     const rule = PROVIDER_LINK_RULES.find((r) => r.match.test(providerName));
     if (rule) return rule.build(showTitle);
     return `https://www.google.com/search?q=${encodeURIComponent('watch ' + showTitle + ' on ' + providerName)}`;
@@ -810,6 +813,45 @@
 
     await saveList();
     renderList();
+  }
+
+  // Store an exact link for ONE specific episode of a show, per service.
+  async function setEpisodeLink(show, episode, providers) {
+    const listShow = list.find((s) => s.tmdbId === show.tmdbId) || show;
+    if (!listShow.episodeLinks) listShow.episodeLinks = {};
+    const ek = epKey(show.tmdbId, episode.season_number, episode.episode_number);
+    if (!listShow.episodeLinks[ek]) listShow.episodeLinks[ek] = {};
+
+    const flatrate = (providers && providers.flatrate) ? providers.flatrate : [];
+    const opts = flatrate.length
+      ? flatrate.map((p, i) => (i + 1) + '. ' + p.provider_name +
+          (listShow.episodeLinks[ek][providerKey(p.provider_name)] ? ' ✅' : ''))
+      : ['1. Netflix', '2. Hulu', '3. Disney+', '4. Max', '5. Prime Video'];
+    const keys = flatrate.length
+      ? flatrate.map((p) => [providerKey(p.provider_name), p.provider_name])
+      : [['netflix','Netflix'],['hulu','Hulu'],['disney','Disney+'],['max','Max'],['prime','Prime Video']];
+
+    const choice = prompt(
+      'Exact link for this episode:\n"' + show.title + '" S' + episode.season_number + 'E' + episode.episode_number +
+      '\n\nWhich service is this link for? Type a number:\n' + opts.join('\n')
+    );
+    if (choice === null) return;
+    const idx = parseInt(choice.trim(), 10) - 1;
+    if (isNaN(idx) || idx < 0 || idx >= keys.length) return;
+    const [key, label] = keys[idx];
+
+    const url = prompt(
+      'Open this exact episode in ' + label + ', copy the URL from the address bar, and paste it here.\n\n' +
+      'On your phone that link will open the ' + label + ' app straight to this episode.'
+      , listShow.episodeLinks[ek][key] || '');
+    if (url === null) return;
+    const trimmed = url.trim();
+    if (trimmed === '') return;
+    if (trimmed === '-') { delete listShow.episodeLinks[ek][key]; }
+    else { listShow.episodeLinks[ek][key] = trimmed; }
+
+    await saveList();
+    renderNowPlaying(show, episode, providers, false);
   }
 
   // ---------- History ----------
@@ -1341,13 +1383,18 @@
     const flatrate = providers && providers.flatrate ? providers.flatrate : [];
 
     let providerHtml = '';
+    let anySearchOnly = false;
     if (flatrate.length) {
       providerHtml = '<div class="providers">' +
         flatrate.map((p) => {
-          const url = buildProviderLink(p.provider_name, show.title, show);
-          const hasExact = !!(show.deepLinks && show.deepLinks[providerKey(p.provider_name)]);
-          const mark = hasExact ? ' 🎯' : '';
-          return '<a class="provider-tag" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '">' + escapeHtml(p.provider_name) + mark + '</a>';
+          const url = buildProviderLink(p.provider_name, show.title, show, episode);
+          const key = providerKey(p.provider_name);
+          const epMap = show.episodeLinks && show.episodeLinks[epKey(show.tmdbId, episode.season_number, episode.episode_number)];
+          const hasEpExact = !!(epMap && epMap[key]);
+          const hasExact = hasEpExact || !!(show.deepLinks && show.deepLinks[key]);
+          if (!hasExact) anySearchOnly = true;
+          const mark = hasEpExact ? ' 🎯ep' : (hasExact ? ' 🎯' : ' 🔎');
+          return '<a class="provider-tag' + (hasExact ? '' : ' search-only') + '" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '">' + escapeHtml(p.provider_name) + mark + '</a>';
         }).join('') +
         '</div>';
     } else {
@@ -1355,7 +1402,11 @@
     }
 
     const banner = isUpNext ? '<div class="up-next-banner">▶ Up next — tap a service below to keep going</div>' : '';
-    const hint = flatrate.length ? '<div class="np-hint">Tap a service to watch — your countdown starts then.</div>' : '';
+    let hint = flatrate.length ? '<div class="np-hint">Tap a service to watch — your countdown starts then.</div>' : '';
+    if (anySearchOnly) {
+      hint += '<div class="np-hint" style="opacity:.85">🔎 = opens a search only (the app may land on its home screen). Tap 🔗 on the show in your list to paste an exact link, or use the button below for just this episode.</div>' +
+        '<div style="margin-top:8px;"><button class="btn btn-ghost btn-small" id="set-ep-link-btn">🔗 Set exact link for this episode</button></div>';
+    }
 
     el('np-content').innerHTML =
       banner +
@@ -1373,6 +1424,12 @@
       resetTimer();
       doShuffle();
     });
+
+    // Set an exact link for THIS specific episode (so the app lands on the episode).
+    const epLinkBtn = el('set-ep-link-btn');
+    if (epLinkBtn) {
+      epLinkBtn.addEventListener('click', () => setEpisodeLink(show, episode, providers));
+    }
 
     // If this episode exists on YouTube, offer to play it right here.
     attachYouTubeOption(show, episode);
@@ -1401,7 +1458,7 @@
         }
         if (!pick) pick = allowed[0];
         startPortal(show, episode, pick.provider_name,
-          buildProviderLink(pick.provider_name, show.title, show));
+          buildProviderLink(pick.provider_name, show.title, show, episode));
       }
     }
   }
@@ -1510,7 +1567,7 @@
           }
           if (!pick && allowed.length) pick = allowed[0];
           if (pick) {
-            const url = buildProviderLink(pick.provider_name, show.title, show);
+            const url = buildProviderLink(pick.provider_name, show.title, show, episode);
             const win = window.open(url, '_blank');
             const banner = document.querySelector('#np-content .up-next-banner');
             if (banner) {
