@@ -169,6 +169,31 @@
   .np-handlink { font-size: 0.72rem; color: var(--text-dim); text-decoration: underline; opacity: 0.7; cursor: pointer; }
   .np-handlink:hover { opacity: 1; }
   .provider-tag.rentbuy { border-style: dashed; opacity: 0.9; }
+  .watch-primary { margin: 6px 0 4px; }
+  .provider-primary {
+    display: block; text-align: center; text-decoration: none;
+    background: linear-gradient(135deg, var(--teal), #4f8cff); color: #041018;
+    font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.05rem;
+    padding: 15px 20px; border-radius: 16px; border: none;
+    box-shadow: 0 10px 26px rgba(79,140,255,.28);
+  }
+  .provider-primary:active { transform: translateY(1px); }
+  .other-services { margin-top: 12px; }
+  .other-services summary {
+    cursor: pointer; font-size: 0.78rem; color: var(--text-dim);
+    list-style: none; text-align: center; opacity: 0.8;
+  }
+  .other-services summary::-webkit-details-marker { display: none; }
+  .other-services summary::before { content: '▸ '; }
+  .other-services[open] summary::before { content: '▾ '; }
+  .other-services .providers { margin-top: 10px; }
+  .yt-play-btn {
+    display: block; width: 100%; text-align: center;
+    background: linear-gradient(135deg, #ff4d6d, #ff8a5c); color: #2a0410;
+    font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.05rem;
+    padding: 15px 20px; border-radius: 16px; border: none; cursor: pointer;
+    box-shadow: 0 10px 26px rgba(255,77,109,.28); margin: 6px 0;
+  }
   .np-escape { margin-top: 8px; }
 
   .now-playing {
@@ -391,7 +416,7 @@
 
     <div class="tv-controls-bottom">
       <button class="btn" id="shuffle-btn" style="font-size:1.05rem; padding:13px 30px;">🔀 Shuffle</button>
-      <label class="autoplay-row">
+      <label class="autoplay-row" style="display:none;">
         <span class="switch">
           <input type="checkbox" id="autoplay-toggle" />
           <span class="slider"></span>
@@ -492,7 +517,7 @@
       createdAt: (p && p.createdAt) || Date.now(),
       list: (p && Array.isArray(p.list)) ? p.list : [],
       history: (p && Array.isArray(p.history)) ? p.history.slice(0, 10) : [],
-      recent: (p && Array.isArray(p.recent)) ? p.recent.slice(-25) : [],
+      recent: (p && Array.isArray(p.recent)) ? p.recent.slice(-500) : [],
       // null = not configured yet; array = only these services get the portal
       services: (p && Array.isArray(p.services)) ? p.services : null,
       // unfinished on-site episode to offer "continue watching"
@@ -545,7 +570,7 @@
     try {
       region = localStorage.getItem('cartoon-shuffler-region') || 'US';
     } catch (e) { region = 'US'; }
-    try { autoplay = localStorage.getItem('cartoon-shuffler-autoplay') === '1'; } catch (e) { autoplay = false; }
+    try { const a = localStorage.getItem('cartoon-shuffler-autoplay'); autoplay = (a === null) ? true : (a === '1'); } catch (e) { autoplay = true; }
     try { portalEnabled = localStorage.getItem('cartoon-shuffler-portal') !== '0'; } catch (e) { portalEnabled = true; }
     try { lastProviderName = localStorage.getItem('cartoon-shuffler-last-provider') || null; } catch (e) { lastProviderName = null; }
     try { watchmodeKey = localStorage.getItem('cartoon-shuffler-watchmode-key') || WATCHMODE_API_KEY; } catch (e) { watchmodeKey = WATCHMODE_API_KEY; }
@@ -780,16 +805,13 @@
       const stillHere = el('np-content');
       if (!stillHere || stillHere !== root) return;
       root.querySelectorAll('.provider-tag.needs-ep[data-runtime]').forEach(function (tag) {
-        const name = tag.textContent.replace(/\s*(🎯ep|🎯|🔎)\s*$/u, '').trim();
-        const key = providerKey(name);
+        const key = providerKey(tag.getAttribute('data-provider') || '');
         if (epMap && epMap[key]) {
           tag.setAttribute('href', epMap[key]);
           tag.classList.remove('search-only', 'needs-ep');
-          tag.textContent = name + ' 🎯ep';
         } else if (tag.classList.contains('search-only') && titleMap && titleMap[key]) {
           tag.setAttribute('href', titleMap[key]);
           tag.classList.remove('search-only');
-          tag.textContent = name + ' 🎯';
         }
       });
     } catch (e) {
@@ -802,18 +824,7 @@
   // (so it would resume). Lets you hand-set this episode's link. Tucked at bottom.
   function renderEpFallback(show, episode, providers) {
     const slot = el('np-fallback');
-    if (!slot) return;
-    const remaining = document.querySelectorAll('#np-content .provider-tag.needs-ep[data-runtime]').length;
-    if (remaining === 0) { slot.innerHTML = ''; return; }
-    slot.innerHTML =
-      '<a href="#" class="np-handlink" id="np-handlink">🎯 want the exact episode? set this one by hand</a>';
-    const link = el('np-handlink');
-    if (link) {
-      link.addEventListener('click', function (ev) {
-        ev.preventDefault();
-        setEpisodeLink(show, episode, providers);
-      });
-    }
+    if (slot) slot.innerHTML = '';
   }
 
   // Link for autoplay/openers. Prefers exact-episode, then show, then search.
@@ -1119,7 +1130,7 @@
     const key = epKey(show.tmdbId, episode.season_number, episode.episode_number);
     recent = recent.filter((k) => k !== key);
     recent.push(key);
-    recent = recent.slice(-25);
+    recent = recent.slice(-500);
     await saveHistory();
     renderHistory();
   }
@@ -1647,25 +1658,31 @@
     let providerHtml = '';
     let anySearchOnly = false;
     if (flatrate.length) {
-      providerHtml = '<div class="providers">' +
-        flatrate.map((p) => {
-          const url = buildProviderLink(p.provider_name, show.title, show, episode);
-          const key = providerKey(p.provider_name);
-          const epMap = show.episodeLinks && show.episodeLinks[epKey(show.tmdbId, episode.season_number, episode.episode_number)];
-          const hasEpExact = !!(epMap && epMap[key]);
-          const hasShowManual = !!(show.deepLinks && show.deepLinks[key]);
-          // Episode-exact = locked. Everything else stays open to an episode upgrade.
-          let cls = 'provider-tag';
-          let mark;
-          if (hasEpExact) { mark = ' 🎯ep'; }
-          else {
-            cls += ' needs-ep';
-            if (hasShowManual) { mark = ' 🎯'; }
-            else { cls += ' search-only'; mark = ' 🔎'; anySearchOnly = true; }
-          }
-          return '<a class="' + cls + '" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '">' + escapeHtml(p.provider_name) + mark + '</a>';
-        }).join('') +
-        '</div>';
+      const epk = epKey(show.tmdbId, episode.season_number, episode.episode_number);
+      // Put services the user HAS first; pick a primary from those.
+      const ordered = flatrate.slice().sort(function (a, b) {
+        return (hasServiceFor(a.provider_name) ? 0 : 1) - (hasServiceFor(b.provider_name) ? 0 : 1);
+      });
+      const primary = ordered.find(function (p) { return hasServiceFor(p.provider_name) && p.provider_name === lastProviderName; })
+        || ordered.find(function (p) { return hasServiceFor(p.provider_name); })
+        || ordered[0];
+      const rest = ordered.filter(function (p) { return p !== primary; });
+      const anchor = function (p, isPrimary) {
+        const url = buildProviderLink(p.provider_name, show.title, show, episode);
+        const key = providerKey(p.provider_name);
+        const epMap = show.episodeLinks && show.episodeLinks[epk];
+        const hasEpExact = !!(epMap && epMap[key]);
+        const hasShowManual = !!(show.deepLinks && show.deepLinks[key]);
+        let cls = isPrimary ? 'provider-primary provider-tag' : 'provider-tag';
+        if (!hasEpExact) { cls += ' needs-ep'; if (!hasShowManual) cls += ' search-only'; }
+        const label = isPrimary ? ('▶ Watch on ' + p.provider_name) : p.provider_name;
+        return '<a class="' + cls + '" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '" data-provider="' + escapeHtml(p.provider_name) + '">' + escapeHtml(label) + '</a>';
+      };
+      providerHtml = '<div class="watch-primary">' + anchor(primary, true) + '</div>';
+      if (rest.length) {
+        providerHtml += '<details class="other-services"><summary>Other ways to watch</summary><div class="providers">' +
+          rest.map(function (p) { return anchor(p, false); }).join('') + '</div></details>';
+      }
     } else {
       // No free or subscription option — offer rent/buy if TMDB has any.
       const rentBuy = [];
@@ -1677,11 +1694,11 @@
         });
       });
       if (rentBuy.length) {
-        providerHtml = '<div class="np-hint" style="opacity:.85">Not free or on subscription — available to rent or buy:</div>' +
+        providerHtml = '<div class="np-hint" style="opacity:.85">Not free or on subscription — rent or buy:</div>' +
           '<div class="providers">' +
           rentBuy.map(function (p) {
             const url = buildProviderLink(p.provider_name, show.title, show, episode);
-            return '<a class="provider-tag rentbuy" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '">💲 ' + escapeHtml(p.provider_name) + '</a>';
+            return '<a class="provider-tag rentbuy" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '" data-provider="' + escapeHtml(p.provider_name) + '">💲 ' + escapeHtml(p.provider_name) + '</a>';
           }).join('') +
           '</div>';
       } else {
@@ -1689,14 +1706,12 @@
       }
     }
 
-    const banner = isUpNext ? '<div class="up-next-banner">▶ Up next — tap a service below to keep going</div>' : '';
-    const hint = flatrate.length ? '<div class="np-hint">Tap a service to watch — your countdown starts then.</div>' : '';
+    const banner = isUpNext ? '<div class="up-next-banner">▶ Up next</div>' : '';
 
     el('np-content').innerHTML =
       banner +
       '<div class="np-show-title">' + escapeHtml(show.title) + '</div>' +
       '<div class="np-ep-line">S' + episode.season_number + 'E' + episode.episode_number + ' · ' + escapeHtml(episode.name || '') + '</div>' +
-      hint +
       '<div class="yt-slot" id="yt-slot"></div>' +
       providerHtml +
       '<div class="np-fallback" id="np-fallback"></div>' +
@@ -1710,19 +1725,18 @@
       doShuffle();
     });
 
-    // If this episode exists on YouTube, offer to play it right here.
+    // If this episode is on YouTube officially, prefer playing it right here.
     attachYouTubeOption(show, episode);
 
-    // Auto-upgrade search-only buttons to real deep links, then show a quiet
-    // hand-set fallback only for services that couldn't be resolved.
+    // Upgrade buttons to real deep links behind the scenes (no visible markers).
     attachWatchmodeLinks(show, episode, providers);
 
     // Every provider tap starts the countdown for THIS episode's runtime.
     document.querySelectorAll('#np-content .provider-tag[data-runtime]').forEach((tagEl) => {
       tagEl.addEventListener('click', () => {
-        cancelPortal(); // they chose for themselves
+        cancelPortal();
         const mins = parseInt(tagEl.getAttribute('data-runtime'), 10) || 22;
-        lastProviderName = tagEl.textContent.replace(/\s*(🎯ep|🎯|🔎)\s*$/u, '').trim();
+        lastProviderName = tagEl.getAttribute('data-provider') || lastProviderName;
         saveLastProvider();
         startTimer(mins);
         addToHistory(show, episode);
@@ -2078,7 +2092,7 @@
       account: { name: account.name, email: account.email || null, createdAt: account.createdAt || Date.now() },
       list,
       history: history.slice(0, 10),
-      recent: recent.slice(-25),
+      recent: recent.slice(-500),
       profiles: named,
       region,
       autoplay,
