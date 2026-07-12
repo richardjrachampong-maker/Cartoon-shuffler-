@@ -441,12 +441,19 @@
   const YT_API_KEY = 'AIzaSyCHD0JsouP06oGE2Sdam24TSpDw0u0';
   // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
 
-  // ▼▼▼ AUTOMATIC DEEP LINKS (Watchmode) — paste a free key to auto-resolve ▼▼▼
-  // Get one free (2,500/mo, no card) at https://api.watchmode.com
-  // With a key, the app looks up each show by its TMDB id and fills in the real
-  // Netflix/Hulu/Disney+ app deep links automatically — no pasting. You can also
-  // set it at runtime with the "⚡ automatic links" button under a show.
-  const WATCHMODE_API_KEY = 'W7DD2EmvvHXn759SiAw0VHXjBQBfevVKtQNvCyFf';
+  // ▼▼▼ AUTOMATIC DEEP LINKS (Watchmode) ▼▼▼
+  // Your key is stored lightly obfuscated (base64) so it isn't sitting in the
+  // source as plain text. NOTE: this only hides it from casual view-source. The
+  // key is still sent to Watchmode on every request, so anyone checking the
+  // browser's Network tab can read it. True hiding needs a server/proxy — ask
+  // if you want that. Everyone using your site shares this key automatically.
+  const WATCHMODE_API_KEY_ENC = 'VzdERDJFbXZ2SFhuNzU5U2lBdzBWSFhqQlFCZmV2Vkt0UU52Q3lGZg==';
+  // Passcode required to VIEW or CHANGE the key from the ⚡ pill. Change this to
+  // something only you know. (It does not need to be secret to use the app.)
+  const VIEW_KEY_CODE = 'shuffle123';
+  let WATCHMODE_API_KEY = '';
+  try { WATCHMODE_API_KEY = atob(WATCHMODE_API_KEY_ENC); } catch (e) { WATCHMODE_API_KEY = ''; }
+  // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
   // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
   const WATCHMODE_BASE = 'https://api.watchmode.com/v1';
   let watchmodeKey = WATCHMODE_API_KEY;
@@ -716,25 +723,36 @@
     if (!id) { wmCache.eps[ck] = { map: {}, t: Date.now() }; wmSaveCache(); return {}; }
     let map = {};
     try {
-      const listHit = wmCache.eps['LIST:' + tmdbId];
+      const listHit = wmCache.eps['LIST:' + tmdbId + ':' + r];
       let episodes;
       if (wmFresh(listHit)) { episodes = listHit.arr; }
       else {
-        episodes = await wmFetch('/title/' + id + '/episodes/');
-        wmCache.eps['LIST:' + tmdbId] = { arr: episodes, t: Date.now() };
+        // Episode-level availability only comes back when the region is supplied.
+        episodes = await wmFetch('/title/' + id + '/episodes/?regions=' + encodeURIComponent(r));
+        wmCache.eps['LIST:' + tmdbId + ':' + r] = { arr: episodes, t: Date.now() };
       }
       const match = (episodes || []).find(function (e) {
         return e.season_number === season && e.episode_number === epNum;
       });
-      if (match && match.id) {
-        const esrc = await wmFetch('/title/' + match.id + '/sources/?regions=' + encodeURIComponent(r));
-        (esrc || []).forEach(function (s) {
-          if (s.region && s.region.toUpperCase() !== r.toUpperCase()) return;
-          if (s.type && s.type !== 'sub' && s.type !== 'free') return;
-          const key = providerKey(s.name);
-          const url = pickDeepUrl(s);
-          if (url && !map[key]) map[key] = url;
-        });
+      if (match) {
+        // Preferred: sources carried directly on the episode object.
+        const collect = function (arr) {
+          (arr || []).forEach(function (s) {
+            if (s.region && s.region.toUpperCase() !== r.toUpperCase()) return;
+            if (s.type && s.type !== 'sub' && s.type !== 'free') return;
+            const key = providerKey(s.name);
+            const url = pickDeepUrl(s);
+            if (url && !map[key]) map[key] = url;
+          });
+        };
+        if (match.sources) collect(match.sources);
+        // Fallback: query the episode id as its own title for sources.
+        if (Object.keys(map).length === 0 && match.id) {
+          try {
+            const esrc = await wmFetch('/title/' + match.id + '/sources/?regions=' + encodeURIComponent(r));
+            collect(esrc);
+          } catch (e2) { /* none available */ }
+        }
       }
     } catch (e) { /* episode-level not available — fall back to title-level */ }
     wmCache.eps[ck] = { map: map, t: Date.now() };
@@ -895,9 +913,11 @@
     }
   }
   el('wm-status').addEventListener('click', () => {
+    const code = prompt('Enter your access code to view or change the API key:');
+    if (code === null) return;
+    if (code !== VIEW_KEY_CODE) { alert('Incorrect code.'); return; }
     const k = prompt(
-      (watchmodeKey ? 'Automatic links are ON.\n\nUpdate or clear your Watchmode key below.\n(Leave empty and press OK to turn off.)'
-                    : 'Paste your free Watchmode API key to turn on automatic deep links.\n\nGet one free (2,500/month, no card) at api.watchmode.com')
+      'Access granted.\n\nCurrent key is shown below. Edit it to change, or leave it to keep.\n(Clear it and press OK to turn auto-links off.)'
       , watchmodeKey || '');
     if (k === null) return;
     watchmodeKey = k.trim();
