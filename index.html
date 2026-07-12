@@ -168,6 +168,7 @@
   .np-fallback { margin-top: 10px; min-height: 0; }
   .np-handlink { font-size: 0.72rem; color: var(--text-dim); text-decoration: underline; opacity: 0.7; cursor: pointer; }
   .np-handlink:hover { opacity: 1; }
+  .provider-tag.rentbuy { border-style: dashed; opacity: 0.9; }
 
   .now-playing {
     border-radius: 20px;
@@ -600,6 +601,12 @@
     { match: /peacock/i, build: (t) => `https://www.peacocktv.com/watch/search?q=${encodeURIComponent(t)}` },
     { match: /apple tv/i, build: (t) => `https://tv.apple.com/search?term=${encodeURIComponent(t)}` },
     { match: /the roku channel/i, build: (t) => `https://therokuchannel.roku.com/search?q=${encodeURIComponent(t)}` },
+    { match: /tubi/i, build: (t) => `https://tubitv.com/search/${encodeURIComponent(t)}` },
+    { match: /pluto/i, build: () => 'https://pluto.tv/en/on-demand' },
+    { match: /freevee/i, build: (t) => `https://www.amazon.com/gp/video/search?phrase=${encodeURIComponent(t)}` },
+    { match: /crackle/i, build: (t) => `https://www.crackle.com/search?q=${encodeURIComponent(t)}` },
+    { match: /\bpbs\b|pbs kids/i, build: (t) => `https://www.pbs.org/search/?q=${encodeURIComponent(t)}` },
+    { match: /plex/i, build: (t) => `https://watch.plex.tv/search?query=${encodeURIComponent(t)}` },
     { match: /amazon|prime video/i, build: (t) => `https://www.primevideo.com/search/ref=atv_nb_sr?phrase=${encodeURIComponent(t)}` },
     { match: /youtube tv/i, build: () => 'https://tv.youtube.com/' },
     { match: /fubo/i, build: () => 'https://www.fubo.tv/welcome' },
@@ -612,6 +619,12 @@
     if (/\bhulu\b/.test(n)) return 'hulu';
     if (/disney/.test(n)) return 'disney';
     if (/\bmax\b|hbo/.test(n)) return 'max';
+    if (/tubi/.test(n)) return 'tubi';
+    if (/pluto/.test(n)) return 'pluto';
+    if (/freevee/.test(n)) return 'freevee';
+    if (/crackle/.test(n)) return 'crackle';
+    if (/\bpbs\b/.test(n)) return 'pbs';
+    if (/plex/.test(n)) return 'plex';
     if (/amazon|prime video/.test(n)) return 'prime';
     if (/paramount/.test(n)) return 'paramount';
     if (/peacock/.test(n)) return 'peacock';
@@ -828,7 +841,19 @@
   async function getWatchProviders(tmdbId, r) {
     const data = await tmdbFetch('/tv/' + tmdbId + '/watch/providers');
     const forRegion = data.results ? data.results[r] : null;
-    return forRegion || null;
+    if (!forRegion) return null;
+    // Combine subscription + free + ad-supported into one "watch now" list, so
+    // shows that aren't on Netflix/Hulu but ARE free on Tubi/Pluto/Roku/PBS still appear.
+    const seen = {};
+    const combined = [];
+    ['flatrate', 'free', 'ads'].forEach(function (bucket) {
+      (forRegion[bucket] || []).forEach(function (p) {
+        const k = providerKey(p.provider_name);
+        if (!seen[k]) { seen[k] = true; combined.push(p); }
+      });
+    });
+    forRegion.flatrate = combined;
+    return forRegion;
   }
 
   // ---------- Setup ----------
@@ -1608,7 +1633,26 @@
         }).join('') +
         '</div>';
     } else {
-      providerHtml = '<div class="providers"><span class="provider-tag dim">No streaming match found for ' + region + '</span></div>';
+      // No free or subscription option — offer rent/buy if TMDB has any.
+      const rentBuy = [];
+      const seenRB = {};
+      ['rent', 'buy'].forEach(function (b) {
+        (providers && providers[b] ? providers[b] : []).forEach(function (p) {
+          const k = providerKey(p.provider_name);
+          if (!seenRB[k]) { seenRB[k] = true; rentBuy.push(p); }
+        });
+      });
+      if (rentBuy.length) {
+        providerHtml = '<div class="np-hint" style="opacity:.85">Not free or on subscription — available to rent or buy:</div>' +
+          '<div class="providers">' +
+          rentBuy.map(function (p) {
+            const url = buildProviderLink(p.provider_name, show.title, show, episode);
+            return '<a class="provider-tag rentbuy" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '">💲 ' + escapeHtml(p.provider_name) + '</a>';
+          }).join('') +
+          '</div>';
+      } else {
+        providerHtml = '<div class="providers"><span class="provider-tag dim">Not streaming anywhere right now in ' + region + '</span></div>';
+      }
     }
 
     const banner = isUpNext ? '<div class="up-next-banner">▶ Up next — tap a service below to keep going</div>' : '';
