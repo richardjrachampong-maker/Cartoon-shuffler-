@@ -160,6 +160,11 @@
   /* Now Playing card */
   .region-row { display: flex; align-items: center; gap: 8px; justify-content: center; margin-bottom: 16px; font-size: 0.8rem; color: var(--text-dim); }
   .region-row select { width: auto; padding: 6px 10px; }
+  .wm-status {
+    border: 1px solid var(--accent-2); background: transparent; color: var(--text-dim);
+    border-radius: 999px; padding: 5px 11px; font-size: 0.72rem; cursor: pointer; font-weight: 600;
+  }
+  .wm-status.on { background: var(--accent-2); color: #06232a; border-color: var(--accent-2); }
 
   .now-playing {
     border-radius: 20px;
@@ -356,6 +361,7 @@
         <option value="CA">Canada</option>
         <option value="AU">Australia</option>
       </select>
+      <button id="wm-status" class="wm-status" title="Automatic deep links">⚡ auto-links: off</button>
     </div>
 
     <div class="now-playing" id="now-playing">
@@ -437,6 +443,16 @@
   // With a key, episodes that exist on YouTube get a "Play on this website" button.
   const YT_API_KEY = '';
   // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
+
+  // ▼▼▼ AUTOMATIC DEEP LINKS (Watchmode) — paste a free key to auto-resolve ▼▼▼
+  // Get one free (2,500/mo, no card) at https://api.watchmode.com
+  // With a key, the app looks up each show by its TMDB id and fills in the real
+  // Netflix/Hulu/Disney+ app deep links automatically — no pasting. You can also
+  // set it at runtime with the "⚡ automatic links" button under a show.
+  const WATCHMODE_API_KEY = '';
+  // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
+  const WATCHMODE_BASE = 'https://api.watchmode.com/v1';
+  let watchmodeKey = WATCHMODE_API_KEY;
 
   let list = [];
   let region = 'US';
@@ -527,6 +543,7 @@
     try { autoplay = localStorage.getItem('cartoon-shuffler-autoplay') === '1'; } catch (e) { autoplay = false; }
     try { portalEnabled = localStorage.getItem('cartoon-shuffler-portal') !== '0'; } catch (e) { portalEnabled = true; }
     try { lastProviderName = localStorage.getItem('cartoon-shuffler-last-provider') || null; } catch (e) { lastProviderName = null; }
+    try { watchmodeKey = localStorage.getItem('cartoon-shuffler-watchmode-key') || WATCHMODE_API_KEY; } catch (e) { watchmodeKey = WATCHMODE_API_KEY; }
     try { bubbleDismissed = localStorage.getItem('cartoon-shuffler-bubble-dismissed') === '1'; } catch (e) { bubbleDismissed = false; }
     try {
       const raw = localStorage.getItem('cartoon-shuffler-watched-since');
@@ -620,6 +637,130 @@
     return `https://www.google.com/search?q=${encodeURIComponent('watch ' + showTitle + ' on ' + providerName)}`;
   }
 
+  // ---------- Automatic deep links via Watchmode ----------
+  // Everything is cached (in memory + localStorage) so we don't burn the free
+  // monthly quota: a show's Watchmode id and its links are looked up at most
+  // once per TTL window, then reused.
+  const WM_TTL_MS = 14 * 24 * 60 * 60 * 1000; // 14 days
+  let wmCache = { ids: {}, sources: {}, eps: {} };
+  try { wmCache = JSON.parse(localStorage.getItem('cartoon-shuffler-wm-cache') || '') || wmCache; } catch (e) {}
+  function wmSaveCache() {
+    try { localStorage.setItem('cartoon-shuffler-wm-cache', JSON.stringify(wmCache)); } catch (e) {}
+  }
+  function wmFresh(entry) { return entry && (Date.now() - entry.t) < WM_TTL_MS; }
+
+  const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent);
+  const isAndroid = /Android/.test(navigator.userAgent);
+  function pickDeepUrl(src) {
+    // Prefer the native app deep link for this device, else the web link.
+    if (isIOS && src.ios_url) return src.ios_url;
+    if (isAndroid && src.android_url) return src.android_url;
+    return src.web_url || src.ios_url || src.android_url || null;
+  }
+
+  async function wmFetch(path) {
+    const sep = path.indexOf('?') === -1 ? '?' : '&';
+    const res = await fetch(WATCHMODE_BASE + path + sep + 'apiKey=' + encodeURIComponent(watchmodeKey));
+    if (!res.ok) throw new Error('Watchmode ' + res.status);
+    return res.json();
+  }
+
+  // Map a TMDB tv id -> Watchmode title id (cached).
+  async function wmResolveId(tmdbId) {
+    const hit = wmCache.ids[tmdbId];
+    if (wmFresh(hit)) return hit.id;
+    const data = await wmFetch('/search/?search_field=tmdb_tv_id&search_value=' + tmdbId + '&types=tv');
+    const first = data && data.title_results && data.title_results[0];
+    const id = first ? first.id : null;
+    wmCache.ids[tmdbId] = { id: id, t: Date.now() };
+    wmSaveCache();
+    return id;
+  }
+
+  // Title-level sources (lands on the show) as { providerKey: url } (cached).
+  async function wmTitleLinks(tmdbId, r) {
+    const ck = tmdbId + ':' + r;
+    const hit = wmCache.sources[ck];
+    if (wmFresh(hit)) return hit.map;
+    const id = await wmResolveId(tmdbId);
+    if (!id) { wmCache.sources[ck] = { map: {}, t: Date.now() }; wmSaveCache(); return {}; }
+    const sources = await wmFetch('/title/' + id + '/sources/?regions=' + encodeURIComponent(r));
+    const map = {};
+    (sources || []).forEach(function (s) {
+      if (s.region && s.region.toUpperCase() !== r.toUpperCase()) return;
+      if (s.type && s.type !== 'sub' && s.type !== 'free') return; // subscription/free only
+      const key = providerKey(s.name);
+      const url = pickDeepUrl(s);
+      if (url && !map[key]) map[key] = url;
+    });
+    wmCache.sources[ck] = { map: map, t: Date.now() };
+    wmSaveCache();
+    return map;
+  }
+
+  // Episode-level sources (lands on the exact episode) when Watchmode has them.
+  async function wmEpisodeLinks(tmdbId, season, epNum, r) {
+    const ck = tmdbId + ':' + season + ':' + epNum + ':' + r;
+    const hit = wmCache.eps[ck];
+    if (wmFresh(hit)) return hit.map;
+    const id = await wmResolveId(tmdbId);
+    if (!id) { wmCache.eps[ck] = { map: {}, t: Date.now() }; wmSaveCache(); return {}; }
+    let map = {};
+    try {
+      const listHit = wmCache.eps['LIST:' + tmdbId];
+      let episodes;
+      if (wmFresh(listHit)) { episodes = listHit.arr; }
+      else {
+        episodes = await wmFetch('/title/' + id + '/episodes/');
+        wmCache.eps['LIST:' + tmdbId] = { arr: episodes, t: Date.now() };
+      }
+      const match = (episodes || []).find(function (e) {
+        return e.season_number === season && e.episode_number === epNum;
+      });
+      if (match && match.id) {
+        const esrc = await wmFetch('/title/' + match.id + '/sources/?regions=' + encodeURIComponent(r));
+        (esrc || []).forEach(function (s) {
+          if (s.region && s.region.toUpperCase() !== r.toUpperCase()) return;
+          if (s.type && s.type !== 'sub' && s.type !== 'free') return;
+          const key = providerKey(s.name);
+          const url = pickDeepUrl(s);
+          if (url && !map[key]) map[key] = url;
+        });
+      }
+    } catch (e) { /* episode-level not available — fall back to title-level */ }
+    wmCache.eps[ck] = { map: map, t: Date.now() };
+    wmSaveCache();
+    return map;
+  }
+
+  // After a card renders, upgrade any search-only buttons to real deep links.
+  async function attachWatchmodeLinks(show, episode) {
+    if (!watchmodeKey) return;
+    const root = el('np-content');
+    if (!root) return;
+    try {
+      const results = await Promise.all([
+        wmEpisodeLinks(show.tmdbId, episode.season_number, episode.episode_number, region),
+        wmTitleLinks(show.tmdbId, region),
+      ]);
+      const epMap = results[0], titleMap = results[1];
+      const stillHere = el('np-content');
+      if (!stillHere || stillHere !== root) return; // a new shuffle replaced this card
+      root.querySelectorAll('.provider-tag.search-only[data-runtime]').forEach(function (tag) {
+        const name = tag.textContent.replace(/\s*(🎯ep|🎯|🔎)\s*$/u, '').trim();
+        const key = providerKey(name);
+        const url = (epMap && epMap[key]) || (titleMap && titleMap[key]);
+        if (url) {
+          tag.setAttribute('href', url);
+          tag.classList.remove('search-only');
+          tag.textContent = name + (epMap && epMap[key] ? ' 🎯ep' : ' 🎯');
+        }
+      });
+    } catch (e) {
+      console.warn('Watchmode lookup failed (links stay as search):', e.message);
+    }
+  }
+
   // ---------- TMDB calls ----------
   async function tmdbFetch(path, params) {
     const url = new URL(TMDB_BASE + path);
@@ -665,6 +806,29 @@
   el('region-select').addEventListener('change', (e) => {
     region = e.target.value;
     saveRegion();
+  });
+
+  // ---------- Auto-links (Watchmode) status pill ----------
+  function updateWmStatus() {
+    const btn = el('wm-status');
+    if (!btn) return;
+    if (watchmodeKey) {
+      btn.textContent = '⚡ auto-links: on';
+      btn.classList.add('on');
+    } else {
+      btn.textContent = '⚡ auto-links: off';
+      btn.classList.remove('on');
+    }
+  }
+  el('wm-status').addEventListener('click', () => {
+    const k = prompt(
+      (watchmodeKey ? 'Automatic links are ON.\n\nUpdate or clear your Watchmode key below.\n(Leave empty and press OK to turn off.)'
+                    : 'Paste your free Watchmode API key to turn on automatic deep links.\n\nGet one free (2,500/month, no card) at api.watchmode.com')
+      , watchmodeKey || '');
+    if (k === null) return;
+    watchmodeKey = k.trim();
+    try { localStorage.setItem('cartoon-shuffler-watchmode-key', watchmodeKey); } catch (e) {}
+    updateWmStatus();
   });
 
   // ---------- Search ----------
@@ -1404,8 +1568,15 @@
     const banner = isUpNext ? '<div class="up-next-banner">▶ Up next — tap a service below to keep going</div>' : '';
     let hint = flatrate.length ? '<div class="np-hint">Tap a service to watch — your countdown starts then.</div>' : '';
     if (anySearchOnly) {
-      hint += '<div class="np-hint" style="opacity:.85">🔎 = opens a search only (the app may land on its home screen). Tap 🔗 on the show in your list to paste an exact link, or use the button below for just this episode.</div>' +
-        '<div style="margin-top:8px;"><button class="btn btn-ghost btn-small" id="set-ep-link-btn">🔗 Set exact link for this episode</button></div>';
+      const autoBtn = watchmodeKey
+        ? ''
+        : '<button class="btn btn-ghost btn-small" id="wm-setup-btn">⚡ Turn on automatic links</button> ';
+      const autoNote = watchmodeKey
+        ? '🔎 = still searching. If it stays 🔎, that service had no deep link for this title — the manual button below always works.'
+        : '🔎 = opens a search only (the app may land on its home screen). Turn on automatic links to fill these in for you, or set one by hand below.';
+      hint += '<div class="np-hint" style="opacity:.85">' + autoNote + '</div>' +
+        '<div style="margin-top:8px;">' + autoBtn +
+        '<button class="btn btn-ghost btn-small" id="set-ep-link-btn">🔗 Set this episode by hand</button></div>';
     }
 
     el('np-content').innerHTML =
@@ -1434,12 +1605,32 @@
     // If this episode exists on YouTube, offer to play it right here.
     attachYouTubeOption(show, episode);
 
+    // Auto-upgrade search-only buttons to real deep links (if a key is set).
+    attachWatchmodeLinks(show, episode);
+
+    // One-tap setup for automatic links when no key is configured yet.
+    const setupBtn = el('wm-setup-btn');
+    if (setupBtn) {
+      setupBtn.addEventListener('click', function () {
+        const k = prompt(
+          'Paste your free Watchmode API key to turn on automatic deep links.\n\n' +
+          'Get one (free, 2,500/month, no credit card) at:\napi.watchmode.com\n\n' +
+          'The app will then look up each show and fill in the real Netflix/Hulu/Disney+ links for you.'
+          , watchmodeKey || '');
+        if (k === null) return;
+        watchmodeKey = k.trim();
+        try { localStorage.setItem('cartoon-shuffler-watchmode-key', watchmodeKey); } catch (e) {}
+        updateWmStatus();
+        attachWatchmodeLinks(show, episode);
+      });
+    }
+
     // Every provider tap starts the countdown for THIS episode's runtime.
     document.querySelectorAll('#np-content .provider-tag[data-runtime]').forEach((tagEl) => {
       tagEl.addEventListener('click', () => {
         cancelPortal(); // they chose for themselves
         const mins = parseInt(tagEl.getAttribute('data-runtime'), 10) || 22;
-        lastProviderName = tagEl.textContent;
+        lastProviderName = tagEl.textContent.replace(/\s*(🎯ep|🎯|🔎)\s*$/u, '').trim();
         saveLastProvider();
         startTimer(mins);
         addToHistory(show, episode);
@@ -2012,6 +2203,7 @@
     renderHistory();
     renderVerse();
     renderGreeting();
+    updateWmStatus();
     el('autoplay-toggle').checked = autoplay;
     el('portal-toggle').checked = portalEnabled;
     renderResumeChip();
