@@ -578,7 +578,7 @@
   // ▼▼▼ YOUTUBE SETUP — paste your YouTube API key between the quotes below ▼▼▼
   // Without a key, the app works exactly as before (streaming buttons only).
   // With a key, episodes that exist on YouTube get a "Play on this website" button.
-  const YT_API_KEY = 'AIzaSyCHD0JsouP06oGE2Sdam24TSpDw0u0';
+  const YT_API_KEY = 'AIzaSyCHD0JsouP06oGE2Sdam24TSpDw0u0-i8Q';
   // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
 
   // ▼▼▼ AUTOMATIC DEEP LINKS (Watchmode) ▼▼▼
@@ -1396,10 +1396,61 @@
   }
   function pad2(n) { return String(n).padStart(2, '0'); }
 
+  // ---------- YouTube quota guard ----------
+  // Searches cost 100 quota units each (free cap: 10,000/day, resets at
+  // midnight Pacific). This tracks the day's spend on this device, caches every
+  // result for 14 days so repeats are free, and stops searching gracefully when
+  // the budget runs out instead of failing all day.
+  const YT_DAILY_BUDGET = 9000; // leave headroom under the 10k cap
+  const YT_SEARCH_COST = 100, YT_VIDEOS_COST = 1;
+  function ytToday() { return new Date().toISOString().slice(0, 10); }
+  function ytUsage() {
+    try {
+      const u = JSON.parse(localStorage.getItem('cartoon-shuffler-yt-usage') || '{}');
+      if (u.d === ytToday()) return u;
+    } catch (e) {}
+    return { d: ytToday(), u: 0, dead: false };
+  }
+  function ytSpend(units) {
+    const u = ytUsage();
+    u.u += units;
+    try { localStorage.setItem('cartoon-shuffler-yt-usage', JSON.stringify(u)); } catch (e) {}
+  }
+  function ytMarkExhausted() {
+    const u = ytUsage();
+    u.dead = true;
+    try { localStorage.setItem('cartoon-shuffler-yt-usage', JSON.stringify(u)); } catch (e) {}
+  }
+  function ytBudgetOk() {
+    const u = ytUsage();
+    return !u.dead && u.u < YT_DAILY_BUDGET;
+  }
+  // Results persist for 14 days so a repeat episode never spends quota again.
+  let ytDiskCache = {};
+  try { ytDiskCache = JSON.parse(localStorage.getItem('cartoon-shuffler-yt-cache') || '{}'); } catch (e) {}
+  function ytCacheGet(key) {
+    const hit = ytDiskCache[key];
+    if (hit && (Date.now() - hit.t) < 14 * 24 * 60 * 60 * 1000) return hit.v;
+    return undefined;
+  }
+  function ytCacheSet(key, val) {
+    ytDiskCache[key] = { v: val, t: Date.now() };
+    const keys = Object.keys(ytDiskCache);
+    if (keys.length > 400) { // keep it bounded — drop oldest
+      keys.sort((a, b) => ytDiskCache[a].t - ytDiskCache[b].t)
+        .slice(0, keys.length - 400).forEach((k) => delete ytDiskCache[k]);
+    }
+    try { localStorage.setItem('cartoon-shuffler-yt-cache', JSON.stringify(ytDiskCache)); } catch (e) {}
+  }
+
   async function findYouTubeEpisode(show, episode) {
     if (!YT_API_KEY) return null;
     const cacheKey = show.tmdbId + '-' + episode.season_number + '-' + episode.episode_number;
     if (cacheKey in ytCache) return ytCache[cacheKey];
+    const disk = ytCacheGet(cacheKey);
+    if (disk !== undefined) { ytCache[cacheKey] = disk; return disk; }
+    // Out of budget for today — skip fresh searches, cached episodes still play.
+    if (!ytBudgetOk()) return null;
     try {
       const runtime = show.avgRuntimeMin || 22;
       const s = episode.season_number, e = episode.episode_number;
@@ -1408,10 +1459,12 @@
       const sxe = ['s' + pad2(s) + 'e' + pad2(e), 's' + s + 'e' + e, s + 'x' + pad2(e), 'season ' + s + ' episode ' + e, 'season ' + s + ', episode ' + e];
 
       async function ytSearch(q) {
+        ytSpend(YT_SEARCH_COST);
         const res = await fetch(
           'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&safeSearch=moderate&maxResults=8' +
           '&q=' + encodeURIComponent(q) + '&key=' + YT_API_KEY
         );
+        if (res.status === 403) { ytMarkExhausted(); throw new Error('YouTube quota exhausted for today'); }
         if (!res.ok) throw new Error('YouTube search HTTP ' + res.status);
         const data = await res.json();
         return (data.items || []).map((i) => i.id && i.id.videoId).filter(Boolean);
@@ -1419,9 +1472,11 @@
 
       async function bestMatch(ids) {
         if (!ids.length) return null;
+        ytSpend(YT_VIDEOS_COST);
         const res = await fetch(
           'https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=' + ids.join(',') + '&key=' + YT_API_KEY
         );
+        if (res.status === 403) { ytMarkExhausted(); throw new Error('YouTube quota exhausted for today'); }
         if (!res.ok) throw new Error('YouTube videos HTTP ' + res.status);
         const data = await res.json();
         let best = null, bestScore = 0;
@@ -1465,6 +1520,7 @@
         result = await bestMatch(await ytSearch(show.title + ' ' + episode.name));
       }
       ytCache[cacheKey] = result;
+      ytCacheSet(cacheKey, result); // survives reloads — repeats cost no quota
       return result;
     } catch (err) {
       console.warn('YouTube lookup skipped:', err);
