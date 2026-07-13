@@ -1509,9 +1509,10 @@
           if (isHd) score += 1;
           // Strongly prefer official / network channels over random reuploads.
           const chan = ((v.snippet && v.snippet.channelTitle) || '').toLowerCase();
-          const OFFICIAL = ['disney', 'cartoon network', 'nickelodeon', 'nick', 'pbs',
-            'warner', 'hbo', 'netflix', 'nbc', 'cbs', 'boomerang', 'adult swim', 'official'];
-          const isOfficial = OFFICIAL.some((c) => chan.indexOf(c) !== -1) || chan.indexOf(showStart) !== -1;
+          const OFFICIAL = ['disney', 'cartoon network', 'nickelodeon', 'nicktoons', 'nick jr',
+            'pbs', 'warner bros', 'hbo', 'netflix', 'nbc', 'cbs', 'boomerang', 'adult swim',
+            'dreamworks', 'peacock kids', 'sesame'];
+          const isOfficial = OFFICIAL.some((c) => chan.indexOf(c) !== -1);
           if (isOfficial) score += 4;
           // Require real evidence it's THIS episode, not just any video of the show.
           if (!epEvidence) return;
@@ -1924,6 +1925,13 @@
         at: Date.now(),
       };
     }
+    // Shuffling past the current pick counts as "not this one" — don't serve
+    // it again this visit (this is what the old skip button used to do).
+    if (shuffleStack.length) {
+      const cur = shuffleStack[shuffleStack.length - 1];
+      const k = epKey(cur.show.tmdbId, cur.episode.season_number, cur.episode.episode_number);
+      if (sessionSeen.indexOf(k) === -1) sessionSeen.push(k);
+    }
     resetTimer();
     doShuffle();
   });
@@ -2165,8 +2173,7 @@
       providerHtml +
       '<div class="np-fallback" id="np-fallback"></div>' +
       '<div style="margin-top:12px;">' +
-        (shuffleStack.length >= 1 ? '<button class="btn btn-ghost btn-small" id="prev-btn">↩ Previous</button> ' : '') +
-        '<button class="btn btn-ghost btn-small" id="skip-btn">↻ Nah, spin again</button>' +
+        (shuffleStack.length >= 1 ? '<button class="btn btn-ghost btn-small" id="prev-btn">↩ Previous</button>' : '') +
       '</div>';
 
     // Record this pick so "Previous" can come back to it (cap the memory).
@@ -2175,14 +2182,6 @@
 
     const prevBtn = el('prev-btn');
     if (prevBtn) prevBtn.addEventListener('click', goPrevious);
-
-    // Skip: doesn't count as watching, but won't come up again this visit.
-    el('skip-btn').addEventListener('click', () => {
-      const key = epKey(show.tmdbId, episode.season_number, episode.episode_number);
-      if (sessionSeen.indexOf(key) === -1) sessionSeen.push(key);
-      resetTimer();
-      doShuffle();
-    });
 
     // If this episode is on YouTube officially, prefer playing it right here.
     attachYouTubeOption(show, episode);
