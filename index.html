@@ -1444,14 +1444,16 @@
     try { localStorage.setItem('cartoon-shuffler-yt-cache', JSON.stringify(ytDiskCache)); } catch (e) {}
   }
 
+  let ytLastStatus = ''; // why the last lookup found nothing (for the card hint)
   async function findYouTubeEpisode(show, episode) {
-    if (!YT_API_KEY) return null;
+    ytLastStatus = '';
+    if (!YT_API_KEY) { ytLastStatus = 'no-key'; return null; }
     const cacheKey = show.tmdbId + '-' + episode.season_number + '-' + episode.episode_number;
     if (cacheKey in ytCache) return ytCache[cacheKey];
     const disk = ytCacheGet(cacheKey);
     if (disk !== undefined) { ytCache[cacheKey] = disk; return disk; }
     // Out of budget for today — skip fresh searches, cached episodes still play.
-    if (!ytBudgetOk()) return null;
+    if (!ytBudgetOk()) { ytLastStatus = 'quota'; return null; }
     try {
       const runtime = show.avgRuntimeMin || 22;
       const s = episode.season_number, e = episode.episode_number;
@@ -1462,7 +1464,7 @@
       async function ytSearch(q) {
         ytSpend(YT_SEARCH_COST);
         const res = await fetch(
-          'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&safeSearch=moderate&maxResults=8' +
+          'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&safeSearch=moderate&maxResults=8' +
           '&q=' + encodeURIComponent(q) + '&key=' + YT_API_KEY
         );
         if (!res.ok) {
@@ -1489,8 +1491,15 @@
         }
         const data = await res.json();
         let best = null, bestScore = 0, bestOfficial = false, bestHd = false, bestTitleEv = false;
+        let sawBlockedOfficial = false;
         (data.items || []).forEach((v) => {
-          if (v.status && v.status.embeddable === false) return;
+          if (v.status && v.status.embeddable === false) {
+            const bc = ((v.snippet && v.snippet.channelTitle) || '').toLowerCase();
+            const OFF2 = ['disney', 'cartoon network', 'nickelodeon', 'nicktoons', 'nick jr',
+              'pbs', 'warner bros', 'hbo', 'netflix', 'nbc', 'cbs', 'boomerang', 'adult swim'];
+            if (OFF2.some((c) => bc.indexOf(c) !== -1)) sawBlockedOfficial = true;
+            return;
+          }
           const mins = isoDurationMinutes(v.contentDetails && v.contentDetails.duration);
           // Must be roughly episode-length: not a clip, not a 3-hour compilation.
           // (Paired-segment shows upload two episodes per video, hence the 2.2x ceiling.)
@@ -1539,8 +1548,10 @@
         });
         // Official channels only: if the best match isn't from a network's own
         // channel, don't play it on-site — the streaming buttons take over.
-        if (!best || bestScore < 3) return null;
-        if (!bestOfficial) return null;
+        if (!best || bestScore < 3 || !bestOfficial) {
+          if (sawBlockedOfficial) ytLastStatus = 'embed-blocked';
+          return null;
+        }
         return { videoId: best.id, title: best.snippet ? best.snippet.title : '' };
       }
 
@@ -1564,6 +1575,7 @@
       return result;
     } catch (err) {
       console.warn('YouTube lookup skipped:', err);
+      if (!ytLastStatus) ytLastStatus = 'error: ' + (err && err.message ? err.message : 'unknown');
       return null; // don't cache errors — quota may reset
     }
   }
@@ -1863,7 +1875,19 @@
     const ia = await findArchiveEpisode(show, episode);
     current = el('yt-slot');
     if (!current || current !== slot) return;
-    if (!ia) { slot.innerHTML = ''; return; }
+    if (!ia) {
+      // Tell the person WHY there's no on-site player, instead of silence.
+      if (ytLastStatus === 'embed-blocked') {
+        slot.innerHTML = '<span class="np-hint">ℹ️ This episode is on YouTube officially, but the network turned off embedding — use the button above.</span>';
+      } else if (ytLastStatus === 'quota') {
+        slot.innerHTML = '<span class="np-hint">ℹ️ YouTube lookups hit today\u2019s limit — back tomorrow. Streaming buttons still work.</span>';
+      } else if (ytLastStatus && ytLastStatus.indexOf('error') === 0) {
+        slot.innerHTML = '<span class="np-hint">⚠️ YouTube check failed (' + escapeHtml(ytLastStatus) + ')</span>';
+      } else {
+        slot.innerHTML = '';
+      }
+      return;
+    }
     if (autoplay && !userStoppedThis) { startArchivePlayback(show, episode, ia.id); return; }
     slot.innerHTML = '<button class="yt-play-btn">▶ Play on this website</button>';
     slot.querySelector('.yt-play-btn').addEventListener('click', () => startArchivePlayback(show, episode, ia.id));
