@@ -269,6 +269,8 @@
   .other-services[open] summary::before { content: '▾ '; }
   .other-services .providers { margin-top: 10px; }
   .np-escape { margin-top: 8px; }
+  .filter-row { display: flex; gap: 8px; justify-content: center; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-row select { width: auto; max-width: 60%; padding: 8px 10px; font-size: 0.82rem; }
 
   .now-playing {
     border-radius: 20px;
@@ -510,6 +512,22 @@
     </div>
 
     <div class="tv-controls-bottom">
+      <div class="filter-row">
+        <select id="filter-show">
+          <option value="">🎲 All shows</option>
+          <option value="netflix">Netflix only</option>
+          <option value="hulu">Hulu only</option>
+          <option value="disney">Disney+ only</option>
+          <option value="max">Max only</option>
+          <option value="prime">Prime Video only</option>
+          <option value="paramount">Paramount+ only</option>
+          <option value="peacock">Peacock only</option>
+          <option value="apple">Apple TV+ only</option>
+          <option value="tubi">Tubi only</option>
+          <option value="pluto">Pluto TV only</option>
+          <option value="roku">Roku Channel only</option>
+        </select>
+      </div>
       <button class="btn" id="shuffle-btn" style="font-size:1.05rem; padding:13px 30px;">🔀 Shuffle</button>
       <label class="autoplay-row" style="display:none;">
         <span class="switch">
@@ -1234,6 +1252,7 @@
       posterPath: found ? found.poster_path : null,
       numberOfSeasons,
       avgRuntimeMin,
+      fetchedAt: Date.now(),
     });
     await saveList();
     renderList();
@@ -1326,13 +1345,19 @@
       title: show.title,
       season: episode.season_number,
       episode: episode.episode_number,
-      epTitle: episode.name || '',
+      epTitle: (episode.name || '') + (episode.pairEp && episode.pairEp.name ? ' / ' + episode.pairEp.name : ''),
     });
     history = history.slice(0, 10);
     // Remember it so shuffle skips it for a while (last 25 watched).
     const key = epKey(show.tmdbId, episode.season_number, episode.episode_number);
     recent = recent.filter((k) => k !== key);
     recent.push(key);
+    // A paired segment counts as watched too — they play together.
+    if (episode.pairEp) {
+      const k2 = epKey(show.tmdbId, episode.season_number, episode.pairEp.episode_number);
+      recent = recent.filter((k) => k !== k2);
+      recent.push(k2);
+    }
     recent = recent.slice(-500);
     await saveHistory();
     renderHistory();
@@ -1480,6 +1505,49 @@
     openTheater(show, episode, videoId, null);
   }
 
+  // ---------- Internet Archive (legal, public-domain collections only) ----------
+  // Searches only curated public-domain collections, so this stays legit.
+  const IA_COLLECTIONS = '(collection:classic_cartoons OR collection:publicdomainmovies OR collection:prelinger OR collection:film_noir OR collection:more_animation)';
+  const iaCache = {};
+  async function findArchiveEpisode(show, episode) {
+    const ck = show.tmdbId + ':' + episode.season_number + ':' + episode.episode_number;
+    if (iaCache[ck] !== undefined) return iaCache[ck];
+    let result = null;
+    try {
+      const q = encodeURIComponent('title:("' + show.title + '") AND mediatype:movies AND ' + IA_COLLECTIONS);
+      const res = await fetch('https://archive.org/advancedsearch.php?q=' + q + '&fl[]=identifier&fl[]=title&rows=10&output=json');
+      if (res.ok) {
+        const data = await res.json();
+        const docs = (data.response && data.response.docs) || [];
+        // Prefer a doc whose title mentions this episode's name or number.
+        const epName = (episode.name || '').toLowerCase();
+        const best = docs.find((d) => epName && (d.title || '').toLowerCase().indexOf(epName) !== -1) || docs[0];
+        if (best) result = { id: best.identifier, title: best.title };
+      }
+    } catch (e) { /* IA unreachable — just skip */ }
+    iaCache[ck] = result;
+    return result;
+  }
+
+  // Plays an Archive item on-site in a simple frame; the countdown timer
+  // handles advancing since IA embeds don't report when they end.
+  function startArchivePlayback(show, episode, iaId) {
+    cancelPortal();
+    lastProviderName = WEBSITE_PROVIDER;
+    saveLastProvider();
+    addToHistory(show, episode);
+    recordWatch(show.tmdbId);
+    const slot = el('yt-slot');
+    if (!slot) return;
+    slot.innerHTML =
+      '<div class="yt-player-wrap"><div class="yt-frame-box">' +
+      '<iframe src="https://archive.org/embed/' + encodeURIComponent(iaId) + '?autoplay=1" allow="autoplay; fullscreen" allowfullscreen></iframe>' +
+      '</div><div class="yt-stop-row"><button class="btn btn-ghost btn-small" id="ia-stop">✕ Stop watching here</button></div></div>';
+    const stop = el('ia-stop');
+    if (stop) stop.addEventListener('click', () => { slot.innerHTML = ''; resetTimer(); });
+    startTimer(episode.displayRuntime || episode.runtime || show.avgRuntimeMin || 22); // timer advances to the next episode
+  }
+
   function theaterTitleText(show, episode) {
     return show.title + ' · S' + episode.season_number + 'E' + episode.episode_number +
       (episode.name ? ' · ' + episode.name : '');
@@ -1545,7 +1613,7 @@
           '?autoplay=1&rel=0&playsinline=1' + (startAt ? '&start=' + startAt : '') +
           '" title="YouTube player" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen style="width:100%; height:100%; border:0; border-radius:12px;"></iframe>';
       }
-      startTimer(show.avgRuntimeMin || 22); // estimate-based autoplay still works
+      startTimer(episode.displayRuntime || episode.runtime || show.avgRuntimeMin || 22); // estimate-based autoplay still works
     }
   }
 
@@ -1667,20 +1735,25 @@
 
   async function attachYouTubeOption(show, episode) {
     const slot = el('yt-slot');
-    if (!slot || !YT_API_KEY) return;
-    slot.innerHTML = '<span class="np-hint">🔎 checking YouTube…</span>';
-    const found = await findYouTubeEpisode(show, episode);
-    const current = el('yt-slot');
+    if (!slot) return;
+    if (YT_API_KEY) slot.innerHTML = '<span class="np-hint">🔎 checking for a free copy…</span>';
+    const found = YT_API_KEY ? await findYouTubeEpisode(show, episode) : null;
+    let current = el('yt-slot');
     if (!current || current !== slot) return; // a new shuffle replaced this card
-    if (!found) { slot.innerHTML = ''; return; }
-    if (document.getElementById('theater-root')) { slot.innerHTML = ''; return; } // already watching
-    // Click-free: if autoplay is on, just start playing it here. The button
-    // stays as a fallback if the browser blocks autoplay on the first video.
-    if (autoplay) {
-      startSitePlayback(show, episode, found.videoId);
+    if (found) {
+      if (document.getElementById('theater-root')) { slot.innerHTML = ''; return; } // already watching
+      if (autoplay) { startSitePlayback(show, episode, found.videoId); return; }
+      renderYtButton(slot, show, episode, found.videoId);
       return;
     }
-    renderYtButton(slot, show, episode, found.videoId);
+    // No official YouTube copy — try the public-domain Internet Archive.
+    const ia = await findArchiveEpisode(show, episode);
+    current = el('yt-slot');
+    if (!current || current !== slot) return;
+    if (!ia) { slot.innerHTML = ''; return; }
+    if (autoplay) { startArchivePlayback(show, episode, ia.id); return; }
+    slot.innerHTML = '<button class="yt-play-btn">▶ Play on this website</button>';
+    slot.querySelector('.yt-play-btn').addEventListener('click', () => startArchivePlayback(show, episode, ia.id));
   }
 
   // ---------- My services (which streaming accounts this profile has) ----------
@@ -1749,16 +1822,52 @@
 
   // ---------- Shuffle / Now Playing ----------
   el('shuffle-btn').addEventListener('click', () => { resetTimer(); doShuffle(); });
+  el('filter-show').addEventListener('change', (e) => { filterService = e.target.value || ''; });
+  // Warm the provider cache quietly after load, one show at a time.
+  async function warmProviderCache() {
+    for (const s of list) { try { await ensureProviders(s); } catch (e) {} }
+  }
 
   function epKey(tmdbId, seasonNumber, episodeNumber) {
     return tmdbId + '-' + seasonNumber + '-' + episodeNumber;
   }
 
   // Try a few times to land on something not watched or skipped recently.
+  // Shuffle filter: only shows available on a chosen service ('' = all shows).
+  let filterService = '';
+
+  // Cache which services each show is on (refreshed every 14 days), so the
+  // service filter can work without a lookup on every single shuffle.
+  async function ensureProviders(show) {
+    if (show.providerKeys && show.providersAt && (Date.now() - show.providersAt) < REFRESH_TTL_MS) return show.providerKeys;
+    try {
+      const p = await getWatchProviders(show.tmdbId, region);
+      show.providerKeys = ((p && p.flatrate) || []).map((x) => providerKey(x.provider_name));
+      show.providersAt = Date.now();
+      saveList();
+    } catch (e) { show.providerKeys = show.providerKeys || []; }
+    return show.providerKeys;
+  }
+
   async function pickFreshEpisode() {
     let fallback = null;
+    let pool = list;
+    if (filterService) {
+      const matches = [];
+      for (const s of list) {
+        const keys = await ensureProviders(s);
+        if (keys.indexOf(filterService) !== -1) matches.push(s);
+      }
+      if (!matches.length) {
+        const label = el('filter-show').options[el('filter-show').selectedIndex].text.replace(' only', '');
+        throw new Error('None of your shows are on ' + label + ' in ' + region + '. Try another filter.');
+      }
+      pool = matches;
+    }
+    if (!pool.length) pool = list;
+
     for (let attempt = 0; attempt < 12; attempt++) {
-      const show = list[Math.floor(Math.random() * list.length)];
+      const show = pool[Math.floor(Math.random() * pool.length)];
       const seasonNumber = 1 + Math.floor(Math.random() * show.numberOfSeasons);
       let episodes = [];
       try { episodes = await getSeasonEpisodes(show.tmdbId, seasonNumber); } catch (e) { /* try another */ }
@@ -1768,13 +1877,58 @@
         return recent.indexOf(key) === -1 && sessionSeen.indexOf(key) === -1;
       });
       if (unseen.length) {
-        return { show, episode: unseen[Math.floor(Math.random() * unseen.length)] };
+        const ep = unseen[Math.floor(Math.random() * unseen.length)];
+        return { show, episode: pairSegments(ep, episodes, show) };
       }
       // Whole season already seen — remember one in case everything's been seen
-      if (!fallback) fallback = { show, episode: episodes[Math.floor(Math.random() * episodes.length)] };
+      if (!fallback) {
+        const ep = episodes[Math.floor(Math.random() * episodes.length)];
+        fallback = { show, episode: pairSegments(ep, episodes, show) };
+      }
     }
     return fallback; // tiny library — allow a repeat rather than nothing
   }
+
+  // Streaming apps usually combine two short cartoon segments (e.g. 11 min each)
+  // into ONE episode, while TMDB lists them separately — which made our names
+  // not match theirs. If the picked episode is a short segment, pair it with its
+  // sibling (odd pairs with the next even) and present them as one episode.
+  function pairSegments(ep, episodes, show) {
+    const rt = (e) => e.runtime || show.avgRuntimeMin || 22;
+    if (rt(ep) > 15) return ep; // full-length episode — nothing to pair
+    // Anchor on the odd segment so E5+E6 always displays in order.
+    let anchor = ep;
+    if (ep.episode_number % 2 === 0) {
+      const odd = episodes.find((e) => e.episode_number === ep.episode_number - 1);
+      if (odd && rt(odd) <= 15) anchor = odd;
+    }
+    const partner = episodes.find((e) => e.episode_number === anchor.episode_number + 1);
+    if (!partner || rt(partner) > 15 || anchor === partner) return ep;
+    const combined = Object.assign({}, anchor);
+    combined.pairEp = { episode_number: partner.episode_number, name: partner.name || '' };
+    combined.displayRuntime = rt(anchor) + rt(partner);
+    return combined;
+  }
+
+  // Quietly refresh a show's details if its data is over 14 days old, so
+  // season counts and runtimes don't go stale as shows get new episodes.
+  const REFRESH_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+  async function refreshShowIfStale(show) {
+    if (show.fetchedAt && (Date.now() - show.fetchedAt) < REFRESH_TTL_MS) return;
+    try {
+      const details = await getShowDetails(show.tmdbId);
+      show.numberOfSeasons = details.number_of_seasons || show.numberOfSeasons;
+      if (details.episode_run_time && details.episode_run_time.length) {
+        show.avgRuntimeMin = details.episode_run_time[0];
+      }
+      if (details.poster_path) show.posterPath = details.poster_path;
+      show.fetchedAt = Date.now();
+      saveList();
+    } catch (e) { /* offline or API hiccup — keep old data */ }
+  }
+
+  // Recent picks, newest last, so "Previous" can step back through them.
+  let shuffleStack = [];
 
   async function doShuffle() {
     el('shuffle-error').textContent = '';
@@ -1789,6 +1943,7 @@
     try {
       const pick = await pickFreshEpisode();
       if (!pick) throw new Error('Could not load any episodes — try again.');
+      refreshShowIfStale(pick.show); // background freshness check
       const providers = await getWatchProviders(pick.show.tmdbId, region);
       hasStartedThisRound = false;
       renderNowPlaying(pick.show, pick.episode, providers, false);
@@ -1798,6 +1953,16 @@
     } finally {
       btn.disabled = false;
     }
+  }
+
+  // Step back to the pick before the current one.
+  async function goPrevious() {
+    if (shuffleStack.length < 2) return;
+    shuffleStack.pop(); // drop the current card
+    const prev = shuffleStack.pop(); // will be re-pushed by renderNowPlaying
+    resetTimer();
+    const providers = await getWatchProviders(prev.show.tmdbId, region);
+    renderNowPlaying(prev.show, prev.episode, providers, false);
   }
 
   function renderNowPlaying(show, episode, providers, isUpNext) {
@@ -1823,7 +1988,7 @@
         let cls = isPrimary ? 'provider-primary provider-tag' : 'provider-tag';
         if (!hasEpExact) { cls += ' needs-ep'; if (!hasShowManual) cls += ' search-only'; }
         const label = isPrimary ? ('▶ Watch on ' + p.provider_name) : p.provider_name;
-        return '<a class="' + cls + '" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '" data-provider="' + escapeHtml(p.provider_name) + '">' + escapeHtml(label) + '</a>';
+        return '<a class="' + cls + '" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + (episode.displayRuntime || episode.runtime || show.avgRuntimeMin) + '" data-provider="' + escapeHtml(p.provider_name) + '">' + escapeHtml(label) + '</a>';
       };
       providerHtml = '<div class="watch-primary">' + anchor(primary, true) + '</div>';
       if (rest.length) {
@@ -1845,7 +2010,7 @@
           '<div class="providers">' +
           rentBuy.map(function (p) {
             const url = buildProviderLink(p.provider_name, show.title, show, episode);
-            return '<a class="provider-tag rentbuy" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + show.avgRuntimeMin + '" data-provider="' + escapeHtml(p.provider_name) + '">💲 ' + escapeHtml(p.provider_name) + '</a>';
+            return '<a class="provider-tag rentbuy" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + (episode.displayRuntime || episode.runtime || show.avgRuntimeMin) + '" data-provider="' + escapeHtml(p.provider_name) + '">💲 ' + escapeHtml(p.provider_name) + '</a>';
           }).join('') +
           '</div>';
       } else {
@@ -1860,15 +2025,31 @@
       ? '<div class="np-art" style="background-image:url(\'' + artSrc + '\')"></div>'
       : '';
 
+    const epLine = episode.pairEp
+      ? 'S' + episode.season_number + 'E' + episode.episode_number + '–E' + episode.pairEp.episode_number +
+        ' · ' + escapeHtml(episode.name || '') + (episode.pairEp.name ? ' / ' + escapeHtml(episode.pairEp.name) : '')
+      : 'S' + episode.season_number + 'E' + episode.episode_number + ' · ' + escapeHtml(episode.name || '');
+
     el('np-content').innerHTML =
       banner +
       artHtml +
       '<div class="np-show-title">' + escapeHtml(show.title) + '</div>' +
-      '<div class="np-ep-line">S' + episode.season_number + 'E' + episode.episode_number + ' · ' + escapeHtml(episode.name || '') + '</div>' +
+      '<div class="np-ep-line">' + epLine + '</div>' +
+      (episode.pairEp ? '<div class="np-hint" style="margin-top:-10px;">two segments — one episode on streaming apps</div>' : '') +
       '<div class="yt-slot" id="yt-slot"></div>' +
       providerHtml +
       '<div class="np-fallback" id="np-fallback"></div>' +
-      '<div style="margin-top:12px;"><button class="btn btn-ghost btn-small" id="skip-btn">↻ Nah, spin again</button></div>';
+      '<div style="margin-top:12px;">' +
+        (shuffleStack.length >= 1 ? '<button class="btn btn-ghost btn-small" id="prev-btn">↩ Previous</button> ' : '') +
+        '<button class="btn btn-ghost btn-small" id="skip-btn">↻ Nah, spin again</button>' +
+      '</div>';
+
+    // Record this pick so "Previous" can come back to it (cap the memory).
+    shuffleStack.push({ show: show, episode: episode });
+    if (shuffleStack.length > 20) shuffleStack.shift();
+
+    const prevBtn = el('prev-btn');
+    if (prevBtn) prevBtn.addEventListener('click', goPrevious);
 
     // Skip: doesn't count as watching, but won't come up again this visit.
     el('skip-btn').addEventListener('click', () => {
@@ -1913,11 +2094,17 @@
     }
   }
 
-  // ---------- Countdown timer ----------
+  // ---------- Countdown timer (wall-clock based) ----------
+  // Uses real timestamps instead of counting ticks, so the countdown stays
+  // accurate even when the tab is in the background or the phone is in another
+  // app. If it expires while away, the shuffle fires the moment they return.
+  let timerEndAt = 0;      // epoch ms when the countdown ends
+  let pausedRemaining = 0; // seconds left when paused
   function startTimer(minutes) {
     resetTimer();
     hasStartedThisRound = true;
     totalSeconds = Math.max(60, minutes * 60);
+    timerEndAt = Date.now() + totalSeconds * 1000;
     remainingSeconds = totalSeconds;
     isPaused = false;
     el('timer-box').style.display = 'block';
@@ -1928,7 +2115,7 @@
 
   function tickTimer() {
     if (isPaused) return;
-    remainingSeconds -= 1;
+    remainingSeconds = Math.ceil((timerEndAt - Date.now()) / 1000);
     updateTimerUI();
     if (remainingSeconds <= 0) {
       clearInterval(timerInterval);
@@ -1936,6 +2123,12 @@
       onTimerFinished();
     }
   }
+
+  // The instant they come back to the tab, catch the timer up — and if it ran
+  // out while they were away, advance to the next episode automatically.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && timerInterval && !isPaused) tickTimer();
+  });
 
   function updateTimerUI() {
     const mm = Math.floor(Math.max(remainingSeconds, 0) / 60).toString().padStart(2, '0');
@@ -1949,6 +2142,11 @@
   el('pause-btn').addEventListener('click', () => {
     if (!timerInterval && !isPaused) return; // nothing running
     isPaused = !isPaused;
+    if (isPaused) {
+      pausedRemaining = Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000));
+    } else {
+      timerEndAt = Date.now() + pausedRemaining * 1000; // resume from where it paused
+    }
     el('pause-btn').textContent = isPaused ? '▶ Resume' : '⏸ Pause';
     updateTimerUI();
   });
@@ -1991,7 +2189,7 @@
 
         if (!playedOnSite) {
           // Start the next countdown automatically.
-          startTimer(show.avgRuntimeMin || 22);
+          startTimer(episode.displayRuntime || episode.runtime || show.avgRuntimeMin || 22);
           addToHistory(show, episode);
           recordWatch(show.tmdbId);
 
@@ -2595,6 +2793,7 @@
     updateWmStatus();
     el('autoplay-toggle').checked = autoplay;
     renderResumeChip();
+    warmProviderCache(); // background — makes the service filter instant
     // If they arrived via a backup-email link, log them straight in.
     await maybeRestoreFromLink();
     // With Firebase on, auth state decides sign-in; auto-loads a returning user.
