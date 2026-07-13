@@ -1481,7 +1481,8 @@
       const runtime = episode.displayRuntime || episode.runtime || show.avgRuntimeMin || 22;
       const OFFICIAL = ['disney', 'cartoon network', 'nickelodeon', 'nicktoons', 'nick jr',
         'pbs', 'warner bros', 'hbo', 'netflix', 'nbc', 'cbs', 'boomerang', 'adult swim',
-        'dreamworks', 'peacock kids', 'sesame'];
+        'dreamworks', 'peacock kids', 'sesame', 'wildbrain', 'johnny test', 'cartoon cartoons',
+        show.title.toLowerCase()];
       (data.items || []).forEach((v, i) => {
         const t = (v.snippet && v.snippet.title) || '?';
         const ch = (v.snippet && v.snippet.channelTitle) || '?';
@@ -1551,7 +1552,8 @@
           if (v.status && v.status.embeddable === false) {
             const bc = ((v.snippet && v.snippet.channelTitle) || '').toLowerCase();
             const OFF2 = ['disney', 'cartoon network', 'nickelodeon', 'nicktoons', 'nick jr',
-              'pbs', 'warner bros', 'hbo', 'netflix', 'nbc', 'cbs', 'boomerang', 'adult swim'];
+              'pbs', 'warner bros', 'hbo', 'netflix', 'nbc', 'cbs', 'boomerang', 'adult swim',
+              'dreamworks', 'wildbrain', 'johnny test', 'cartoon cartoons', showStart];
             if (OFF2.some((c) => bc.indexOf(c) !== -1)) sawBlockedOfficial = true;
             return;
           }
@@ -1584,8 +1586,11 @@
           const chan = ((v.snippet && v.snippet.channelTitle) || '').toLowerCase();
           const OFFICIAL = ['disney', 'cartoon network', 'nickelodeon', 'nicktoons', 'nick jr',
             'pbs', 'warner bros', 'hbo', 'netflix', 'nbc', 'cbs', 'boomerang', 'adult swim',
-            'dreamworks', 'peacock kids', 'sesame'];
-          const isOfficial = OFFICIAL.some((c) => chan.indexOf(c) !== -1);
+            'dreamworks', 'peacock kids', 'sesame', 'wildbrain', 'johnny test', 'cartoon cartoons'];
+          // Networks also run per-show channels (e.g. a "Regular Show" channel),
+          // so a channel named after the show itself counts as official too.
+          const isOfficial = OFFICIAL.some((c) => chan.indexOf(c) !== -1) ||
+            chan.indexOf(show.title.toLowerCase()) !== -1;
           if (isOfficial) score += 4;
           // Networks number episodes differently than TMDB (their "S1 E4" can be
           // our S1E13-14). If we searched by the segment's NAME and this is an
