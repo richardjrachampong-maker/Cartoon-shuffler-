@@ -1669,53 +1669,6 @@
     openTheater(show, episode, videoId, null);
   }
 
-  // ---------- Internet Archive (legal, public-domain collections only) ----------
-  // Searches only curated public-domain collections, so this stays legit.
-  const IA_COLLECTIONS = '(collection:classic_cartoons OR collection:publicdomainmovies OR collection:prelinger OR collection:film_noir OR collection:more_animation)';
-  const iaCache = {};
-  async function findArchiveEpisode(show, episode) {
-    const ck = show.tmdbId + ':' + episode.season_number + ':' + episode.episode_number;
-    if (iaCache[ck] !== undefined) return iaCache[ck];
-    let result = null;
-    try {
-      const q = encodeURIComponent('title:("' + show.title + '") AND mediatype:movies AND ' + IA_COLLECTIONS);
-      const res = await fetch('https://archive.org/advancedsearch.php?q=' + q + '&fl[]=identifier&fl[]=title&rows=10&output=json');
-      if (res.ok) {
-        const data = await res.json();
-        const docs = (data.response && data.response.docs) || [];
-        // Prefer a doc whose title mentions this episode's name or number.
-        const epName = (episode.name || '').toLowerCase();
-        const best = docs.find((d) => epName && (d.title || '').toLowerCase().indexOf(epName) !== -1) || docs[0];
-        if (best) result = { id: best.identifier, title: best.title };
-      }
-    } catch (e) { /* IA unreachable — just skip */ }
-    iaCache[ck] = result;
-    return result;
-  }
-
-  // Plays an Archive item on-site in a simple frame; the countdown timer
-  // handles advancing since IA embeds don't report when they end.
-  function startArchivePlayback(show, episode, iaId) {
-    cancelPortal();
-    stoppedEpKey = null; // playing again — clear the stop lock
-    lastProviderName = WEBSITE_PROVIDER;
-    saveLastProvider();
-    addToHistory(show, episode);
-    recordWatch(show.tmdbId);
-    const slot = el('yt-slot');
-    if (!slot) return;
-    slot.innerHTML =
-      '<div class="yt-player-wrap"><div class="yt-frame-box">' +
-      '<iframe src="https://archive.org/embed/' + encodeURIComponent(iaId) + '?autoplay=1" allow="autoplay; fullscreen" allowfullscreen></iframe>' +
-      '</div><div class="yt-stop-row"><button class="btn btn-ghost btn-small" id="ia-stop">✕ Stop watching here</button></div></div>';
-    const stop = el('ia-stop');
-    if (stop) stop.addEventListener('click', () => {
-      stoppedEpKey = epKey(show.tmdbId, episode.season_number, episode.episode_number);
-      slot.innerHTML = ''; resetTimer();
-    });
-    startTimer(episode.displayRuntime || episode.runtime || show.avgRuntimeMin || 22); // timer advances to the next episode
-  }
-
   function theaterTitleText(show, episode) {
     return show.title + ' · S' + episode.season_number + 'E' + episode.episode_number +
       (episode.name ? ' · ' + episode.name : '');
@@ -1926,29 +1879,18 @@
       renderYtButton(slot, show, episode, found.videoId);
       return;
     }
-    // No official YouTube copy — try the public-domain Internet Archive.
-    const ia = await findArchiveEpisode(show, episode);
-    current = el('yt-slot');
-    if (!current || current !== slot) return;
-    if (!ia) {
-      // Tell the person WHY there's no on-site player, instead of silence —
-      // and offer the full diagnostic with one tap.
-      let msg = '';
-      if (ytLastStatus === 'embed-blocked') {
-        msg = 'ℹ️ On YouTube officially, but the network turned off embedding — use the button above. ';
-      } else if (ytLastStatus === 'quota') {
-        msg = 'ℹ️ YouTube lookups hit today\u2019s limit — back tomorrow. ';
-      } else if (ytLastStatus && ytLastStatus.indexOf('error') === 0) {
-        msg = '⚠️ YouTube check failed (' + escapeHtml(ytLastStatus) + ') ';
-      }
-      slot.innerHTML = '<span class="np-hint">' + msg + '<a href="#" id="yt-diag" style="color:var(--teal); text-decoration:underline;">🔬 diagnose</a></span>';
-      const d = el('yt-diag');
-      if (d) d.addEventListener('click', (ev) => { ev.preventDefault(); ytDiagnose(show, episode); });
-      return;
+    // No official YouTube copy — say why (when known) and offer the diagnostic.
+    let msg = '';
+    if (ytLastStatus === 'embed-blocked') {
+      msg = 'ℹ️ On YouTube officially, but the network turned off embedding — use the button above. ';
+    } else if (ytLastStatus === 'quota') {
+      msg = 'ℹ️ YouTube lookups hit today\u2019s limit — back tomorrow. ';
+    } else if (ytLastStatus && ytLastStatus.indexOf('error') === 0) {
+      msg = '⚠️ YouTube check failed (' + escapeHtml(ytLastStatus) + ') ';
     }
-    if (autoplay && !userStoppedThis) { startArchivePlayback(show, episode, ia.id); return; }
-    slot.innerHTML = '<button class="yt-play-btn">▶ Play on this website</button>';
-    slot.querySelector('.yt-play-btn').addEventListener('click', () => startArchivePlayback(show, episode, ia.id));
+    slot.innerHTML = '<span class="np-hint">' + msg + '<a href="#" id="yt-diag" style="color:var(--teal); text-decoration:underline;">🔬 diagnose</a></span>';
+    const d = el('yt-diag');
+    if (d) d.addEventListener('click', (ev) => { ev.preventDefault(); ytDiagnose(show, episode); });
   }
 
   // ---------- My services (which streaming accounts this profile has) ----------
