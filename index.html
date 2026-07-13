@@ -1404,12 +1404,13 @@
   const YT_DAILY_BUDGET = 9000; // leave headroom under the 10k cap
   const YT_SEARCH_COST = 100, YT_VIDEOS_COST = 1;
   function ytToday() { return new Date().toISOString().slice(0, 10); }
+  const YT_KEY_TAG = YT_API_KEY.slice(-6); // usage resets if the key changes
   function ytUsage() {
     try {
       const u = JSON.parse(localStorage.getItem('cartoon-shuffler-yt-usage') || '{}');
-      if (u.d === ytToday()) return u;
+      if (u.d === ytToday() && u.k === YT_KEY_TAG) return u;
     } catch (e) {}
-    return { d: ytToday(), u: 0, dead: false };
+    return { d: ytToday(), k: YT_KEY_TAG, u: 0, dead: false };
   }
   function ytSpend(units) {
     const u = ytUsage();
@@ -1464,20 +1465,28 @@
           'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&safeSearch=moderate&maxResults=8' +
           '&q=' + encodeURIComponent(q) + '&key=' + YT_API_KEY
         );
-        if (res.status === 403) { ytMarkExhausted(); throw new Error('YouTube quota exhausted for today'); }
-        if (!res.ok) throw new Error('YouTube search HTTP ' + res.status);
+        if (!res.ok) {
+          let reason = '';
+          try { const eb = await res.json(); reason = (eb.error && eb.error.errors && eb.error.errors[0] && eb.error.errors[0].reason) || ''; } catch (e2) {}
+          if (reason === 'quotaExceeded' || reason === 'dailyLimitExceeded' || reason === 'rateLimitExceeded') ytMarkExhausted();
+          throw new Error('YouTube search ' + res.status + (reason ? ' (' + reason + ')' : ''));
+        }
         const data = await res.json();
         return (data.items || []).map((i) => i.id && i.id.videoId).filter(Boolean);
       }
 
-      async function bestMatch(ids) {
+      async function bestMatch(ids, isNameSearch) {
         if (!ids.length) return null;
         ytSpend(YT_VIDEOS_COST);
         const res = await fetch(
           'https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=' + ids.join(',') + '&key=' + YT_API_KEY
         );
-        if (res.status === 403) { ytMarkExhausted(); throw new Error('YouTube quota exhausted for today'); }
-        if (!res.ok) throw new Error('YouTube videos HTTP ' + res.status);
+        if (!res.ok) {
+          let reason = '';
+          try { const eb = await res.json(); reason = (eb.error && eb.error.errors && eb.error.errors[0] && eb.error.errors[0].reason) || ''; } catch (e2) {}
+          if (reason === 'quotaExceeded' || reason === 'dailyLimitExceeded' || reason === 'rateLimitExceeded') ytMarkExhausted();
+          throw new Error('YouTube videos ' + res.status + (reason ? ' (' + reason + ')' : ''));
+        }
         const data = await res.json();
         let best = null, bestScore = 0, bestOfficial = false, bestHd = false, bestTitleEv = false;
         (data.items || []).forEach((v) => {
@@ -1514,6 +1523,13 @@
             'dreamworks', 'peacock kids', 'sesame'];
           const isOfficial = OFFICIAL.some((c) => chan.indexOf(c) !== -1);
           if (isOfficial) score += 4;
+          // Networks number episodes differently than TMDB (their "S1 E4" can be
+          // our S1E13-14). If we searched by the segment's NAME and this is an
+          // official channel's full episode, that's evidence enough.
+          if (isNameSearch && isOfficial &&
+              (title.indexOf('full episode') !== -1 || title.indexOf('full ep') !== -1)) {
+            epEvidence = true; score += 1;
+          }
           // Require real evidence it's THIS episode, not just any video of the show.
           if (!epEvidence) return;
           if (score > bestScore) {
@@ -1536,7 +1552,12 @@
       // segment (e.g. two 11-min cartoons uploaded as one video under the
       // other segment's title, with this one named in the description).
       if (!result && episode.name) {
-        result = await bestMatch(await ytSearch(show.title + ' ' + episode.name));
+        result = await bestMatch(await ytSearch(show.title + ' ' + episode.name + ' full episode'), true);
+      }
+      // Round 3: same, using the paired segment's name (networks often title
+      // the combined upload after the OTHER half).
+      if (!result && episode.pairEp && episode.pairEp.name) {
+        result = await bestMatch(await ytSearch(show.title + ' ' + episode.pairEp.name + ' full episode'), true);
       }
       ytCache[cacheKey] = result;
       ytCacheSet(cacheKey, result); // survives reloads — repeats cost no quota
