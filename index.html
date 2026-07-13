@@ -1821,7 +1821,21 @@
   }
 
   // ---------- Shuffle / Now Playing ----------
-  el('shuffle-btn').addEventListener('click', () => { resetTimer(); doShuffle(); });
+  // If they hit Shuffle while an episode's countdown is running (often by
+  // accident), remember where the timer was so "Previous" can restore it.
+  let timerSnapshot = null;
+  el('shuffle-btn').addEventListener('click', () => {
+    if (timerInterval && !isPaused && shuffleStack.length) {
+      const cur = shuffleStack[shuffleStack.length - 1];
+      timerSnapshot = {
+        key: epKey(cur.show.tmdbId, cur.episode.season_number, cur.episode.episode_number),
+        remaining: Math.max(0, Math.ceil((timerEndAt - Date.now()) / 1000)),
+        at: Date.now(),
+      };
+    }
+    resetTimer();
+    doShuffle();
+  });
   el('filter-show').addEventListener('change', (e) => { filterService = e.target.value || ''; });
   // Warm the provider cache quietly after load, one show at a time.
   async function warmProviderCache() {
@@ -1963,6 +1977,26 @@
     resetTimer();
     const providers = await getWatchProviders(prev.show.tmdbId, region);
     renderNowPlaying(prev.show, prev.episode, providers, false);
+    // If we interrupted this exact episode's countdown (within the last 10
+    // minutes), pick the timer back up where it was — accounting for the time
+    // that passed while they were away from it.
+    if (timerSnapshot) {
+      const key = epKey(prev.show.tmdbId, prev.episode.season_number, prev.episode.episode_number);
+      const elapsed = Math.floor((Date.now() - timerSnapshot.at) / 1000);
+      const left = timerSnapshot.remaining - elapsed;
+      if (timerSnapshot.key === key && elapsed < 600 && left > 5) {
+        hasStartedThisRound = true;
+        totalSeconds = Math.max(totalSeconds, left);
+        timerEndAt = Date.now() + left * 1000;
+        remainingSeconds = left;
+        isPaused = false;
+        el('timer-box').style.display = 'block';
+        el('pause-btn').textContent = '⏸ Pause';
+        tickTimer();
+        timerInterval = setInterval(tickTimer, 1000);
+      }
+      timerSnapshot = null;
+    }
   }
 
   function renderNowPlaying(show, episode, providers, isUpNext) {
