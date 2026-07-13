@@ -1479,7 +1479,7 @@
         if (res.status === 403) { ytMarkExhausted(); throw new Error('YouTube quota exhausted for today'); }
         if (!res.ok) throw new Error('YouTube videos HTTP ' + res.status);
         const data = await res.json();
-        let best = null, bestScore = 0;
+        let best = null, bestScore = 0, bestOfficial = false, bestHd = false, bestTitleEv = false;
         (data.items || []).forEach((v) => {
           if (v.status && v.status.embeddable === false) return;
           const mins = isoDurationMinutes(v.contentDetails && v.contentDetails.duration);
@@ -1493,27 +1493,39 @@
           const NOT_EPISODE = ['reaction', 'reacts', 'first time watching',
             'blind watch', 'review', 'recap', 'breakdown', 'explained', 'analysis',
             'commentary', 'theory', 'top 10', 'top ten', 'trailer', 'teaser', 'promo',
-            'behind the scenes', 'easter eggs', 'best moments', 'funniest moments'];
+            'behind the scenes', 'easter eggs', 'best moments', 'funniest moments',
+            'screen record', 'cam rip', 'camrip', 'low quality', 'bad quality'];
           if (NOT_EPISODE.some((w) => title.indexOf(w) !== -1) || chan0.indexOf('reac') !== -1) return;
-          let score = 0, epEvidence = false;
-          if (sxe.some((p) => title.indexOf(p) !== -1)) { score += 3; epEvidence = true; }
+          let score = 0, epEvidence = false, titleEvidence = false;
+          const isHd = !!(v.contentDetails && v.contentDetails.definition === 'hd');
+          if (sxe.some((p) => title.indexOf(p) !== -1)) { score += 3; epEvidence = true; titleEvidence = true; }
           else if (sxe.some((p) => desc.indexOf(p) !== -1)) { score += 1; epEvidence = true; }
           if (epName && epName.length > 3) {
-            if (title.indexOf(epName) !== -1) { score += 3; epEvidence = true; }
+            if (title.indexOf(epName) !== -1) { score += 3; epEvidence = true; titleEvidence = true; }
             else if (desc.indexOf(epName) !== -1) { score += 2; epEvidence = true; }
           }
           if (title.indexOf('full episode') !== -1 || title.indexOf('full ep') !== -1) score += 2;
           if (title.indexOf(showStart) !== -1 || desc.indexOf(showStart) !== -1) score += 1;
+          if (isHd) score += 1;
           // Strongly prefer official / network channels over random reuploads.
           const chan = ((v.snippet && v.snippet.channelTitle) || '').toLowerCase();
           const OFFICIAL = ['disney', 'cartoon network', 'nickelodeon', 'nick', 'pbs',
             'warner', 'hbo', 'netflix', 'nbc', 'cbs', 'boomerang', 'adult swim', 'official'];
-          if (OFFICIAL.some((c) => chan.indexOf(c) !== -1) || chan.indexOf(showStart) !== -1) score += 4;
+          const isOfficial = OFFICIAL.some((c) => chan.indexOf(c) !== -1) || chan.indexOf(showStart) !== -1;
+          if (isOfficial) score += 4;
           // Require real evidence it's THIS episode, not just any video of the show.
           if (!epEvidence) return;
-          if (score > bestScore) { bestScore = score; best = v; }
+          if (score > bestScore) {
+            bestScore = score; best = v;
+            bestOfficial = isOfficial; bestHd = isHd; bestTitleEv = titleEvidence;
+          }
         });
-        return (best && bestScore >= 3) ? { videoId: best.id, title: best.snippet ? best.snippet.title : '' } : null;
+        // Quality bar: play it only if it's an official/network upload, or a
+        // clearly-labeled HD upload. Sketchy SD reuploads don't make the cut —
+        // the streaming buttons are a better experience than a bad rip.
+        if (!best || bestScore < 3) return null;
+        if (!bestOfficial && !(bestHd && bestTitleEv)) return null;
+        return { videoId: best.id, title: best.snippet ? best.snippet.title : '' };
       }
 
       // Round 1: search by season/episode number.
@@ -1561,6 +1573,7 @@
   // remembers the "provider", and opens the theater.
   function startSitePlayback(show, episode, videoId) {
     cancelPortal();
+    stoppedEpKey = null; // playing again — clear the stop lock
     lastProviderName = WEBSITE_PROVIDER;
     saveLastProvider();
     addToHistory(show, episode);
@@ -1596,6 +1609,7 @@
   // handles advancing since IA embeds don't report when they end.
   function startArchivePlayback(show, episode, iaId) {
     cancelPortal();
+    stoppedEpKey = null; // playing again — clear the stop lock
     lastProviderName = WEBSITE_PROVIDER;
     saveLastProvider();
     addToHistory(show, episode);
@@ -1607,7 +1621,10 @@
       '<iframe src="https://archive.org/embed/' + encodeURIComponent(iaId) + '?autoplay=1" allow="autoplay; fullscreen" allowfullscreen></iframe>' +
       '</div><div class="yt-stop-row"><button class="btn btn-ghost btn-small" id="ia-stop">✕ Stop watching here</button></div></div>';
     const stop = el('ia-stop');
-    if (stop) stop.addEventListener('click', () => { slot.innerHTML = ''; resetTimer(); });
+    if (stop) stop.addEventListener('click', () => {
+      stoppedEpKey = epKey(show.tmdbId, episode.season_number, episode.episode_number);
+      slot.innerHTML = ''; resetTimer();
+    });
     startTimer(episode.displayRuntime || episode.runtime || show.avgRuntimeMin || 22); // timer advances to the next episode
   }
 
@@ -1707,9 +1724,9 @@
     } catch (e) {}
   }
 
-  // Set when the user deliberately stops on-site playback, so the play option
-  // comes back as a BUTTON instead of instantly auto-restarting the episode.
-  let suppressAutoOnce = false;
+  // Remembers the exact episode the user stopped, so nothing can auto-restart
+  // it — no matter how many times the card re-renders. Cleared on next shuffle.
+  let stoppedEpKey = null;
 
   function closeTheater(saveProgress) {
     if (theaterInterval) { clearInterval(theaterInterval); theaterInterval = null; }
@@ -1722,7 +1739,10 @@
     theaterState = null;
     // Put the play button back on the card, and offer resume if applicable.
     if (s) {
-      if (saveProgress) suppressAutoOnce = true; // they chose to stop — don't restart
+      if (saveProgress) {
+        // They chose to stop THIS episode — lock it out of auto-play.
+        stoppedEpKey = epKey(s.show.tmdbId, s.episode.season_number, s.episode.episode_number);
+      }
       const slot = el('yt-slot'); if (slot) attachYouTubeOption(s.show, s.episode);
     }
     renderResumeChip();
@@ -1810,10 +1830,11 @@
     const found = YT_API_KEY ? await findYouTubeEpisode(show, episode) : null;
     let current = el('yt-slot');
     if (!current || current !== slot) return; // a new shuffle replaced this card
+    const thisKey = epKey(show.tmdbId, episode.season_number, episode.episode_number);
+    const userStoppedThis = stoppedEpKey === thisKey;
     if (found) {
       if (document.getElementById('theater-root')) { slot.innerHTML = ''; return; } // already watching
-      if (autoplay && !suppressAutoOnce) { startSitePlayback(show, episode, found.videoId); return; }
-      suppressAutoOnce = false; // consumed — next shuffle auto-plays again
+      if (autoplay && !userStoppedThis) { startSitePlayback(show, episode, found.videoId); return; }
       renderYtButton(slot, show, episode, found.videoId);
       return;
     }
@@ -1822,8 +1843,7 @@
     current = el('yt-slot');
     if (!current || current !== slot) return;
     if (!ia) { slot.innerHTML = ''; return; }
-    if (autoplay && !suppressAutoOnce) { startArchivePlayback(show, episode, ia.id); return; }
-    suppressAutoOnce = false;
+    if (autoplay && !userStoppedThis) { startArchivePlayback(show, episode, ia.id); return; }
     slot.innerHTML = '<button class="yt-play-btn">▶ Play on this website</button>';
     slot.querySelector('.yt-play-btn').addEventListener('click', () => startArchivePlayback(show, episode, ia.id));
   }
