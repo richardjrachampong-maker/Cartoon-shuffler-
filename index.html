@@ -1520,11 +1520,10 @@
             bestOfficial = isOfficial; bestHd = isHd; bestTitleEv = titleEvidence;
           }
         });
-        // Quality bar: play it only if it's an official/network upload, or a
-        // clearly-labeled HD upload. Sketchy SD reuploads don't make the cut —
-        // the streaming buttons are a better experience than a bad rip.
+        // Official channels only: if the best match isn't from a network's own
+        // channel, don't play it on-site — the streaming buttons take over.
         if (!best || bestScore < 3) return null;
-        if (!bestOfficial && !(bestHd && bestTitleEv)) return null;
+        if (!bestOfficial) return null;
         return { videoId: best.id, title: best.snippet ? best.snippet.title : '' };
       }
 
