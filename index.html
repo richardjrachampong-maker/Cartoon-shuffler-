@@ -1592,15 +1592,22 @@
           const isOfficial = OFFICIAL.some((c) => chan.indexOf(c) !== -1) ||
             chan.indexOf(show.title.toLowerCase()) !== -1;
           if (isOfficial) score += 4;
-          // Networks number episodes differently than TMDB (their "S1 E4" can be
-          // our S1E13-14). If we searched by the segment's NAME and this is an
-          // official channel's full episode, that's evidence enough.
-          if (isNameSearch && isOfficial &&
-              (title.indexOf('full episode') !== -1 || title.indexOf('full ep') !== -1)) {
-            epEvidence = true; score += 1;
-          }
-          // Require real evidence it's THIS episode, not just any video of the show.
+          // Require real evidence it's THIS episode — the episode's name or its
+          // number in the title/description. "Some official full episode of the
+          // show" is NOT enough: that's how the wrong episode gets played.
           if (!epEvidence) return;
+          // Contradiction guard: if the video's own title declares a DIFFERENT
+          // episode number (like "S1 E19" when we want S2E20), only a direct
+          // name match in the TITLE can overrule it (covers networks whose
+          // numbering differs from ours). Description-only evidence loses.
+          const declared = title.match(/s(\d{1,2})\s*[.·|x -]*\s*e(\d{1,3})/);
+          if (declared && !titleEvidence) {
+            const ds = parseInt(declared[1], 10), de = parseInt(declared[2], 10);
+            const wantEps = [episode.episode_number];
+            if (episode.pairEp) wantEps.push(episode.pairEp.episode_number);
+            if (ds !== episode.season_number || wantEps.indexOf(de) === -1) return;
+          }
+          void isNameSearch;
           if (score > bestScore) {
             bestScore = score; best = v;
             bestOfficial = isOfficial; bestHd = isHd; bestTitleEv = titleEvidence;
