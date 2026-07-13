@@ -1444,6 +1444,61 @@
     try { localStorage.setItem('cartoon-shuffler-yt-cache', JSON.stringify(ytDiskCache)); } catch (e) {}
   }
 
+  // ---------- One-tap YouTube diagnostic ----------
+  // Runs the real lookup for the current episode and prints exactly what came
+  // back and why each result was accepted or rejected. Ends the guessing.
+  async function ytDiagnose(show, episode) {
+    const slot = el('yt-slot');
+    if (!slot) return;
+    const out = [];
+    const P = (t) => { out.push(t); slot.innerHTML = '<div class="np-hint" style="text-align:left; font-family:monospace; font-size:0.68rem; white-space:pre-wrap;">' + out.map(escapeHtml).join('\n') + '</div>'; };
+    P('🔬 YouTube diagnostic');
+    P('key: ' + (YT_API_KEY ? YT_API_KEY.slice(0, 8) + '… (' + YT_API_KEY.length + ' chars)' : 'MISSING'));
+    const u = ytUsage();
+    P('quota today: ' + u.u + ' units used' + (u.dead ? ' — MARKED EXHAUSTED' : ''));
+    if (!YT_API_KEY) return;
+    const q = show.title + ' season ' + episode.season_number + ' episode ' + episode.episode_number + ' full episode';
+    P('search: "' + q + '"');
+    let items = [];
+    try {
+      ytSpend(YT_SEARCH_COST);
+      const res = await fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&safeSearch=moderate&maxResults=8&q=' + encodeURIComponent(q) + '&key=' + YT_API_KEY);
+      const body = await res.json();
+      if (!res.ok) {
+        const er = (body.error && body.error.errors && body.error.errors[0]) || {};
+        P('❌ SEARCH FAILED — HTTP ' + res.status + ' reason: ' + (er.reason || '?') + ' — ' + ((body.error && body.error.message) || ''));
+        return;
+      }
+      items = (body.items || []).map((i) => i.id && i.id.videoId).filter(Boolean);
+      P('results: ' + items.length);
+    } catch (e) { P('❌ SEARCH THREW: ' + e.message); return; }
+    if (!items.length) { P('(nothing came back for that query)'); return; }
+    try {
+      ytSpend(YT_VIDEOS_COST);
+      const res2 = await fetch('https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=' + items.join(',') + '&key=' + YT_API_KEY);
+      const data = await res2.json();
+      if (!res2.ok) { P('❌ DETAILS FAILED — HTTP ' + res2.status); return; }
+      const runtime = episode.displayRuntime || episode.runtime || show.avgRuntimeMin || 22;
+      const OFFICIAL = ['disney', 'cartoon network', 'nickelodeon', 'nicktoons', 'nick jr',
+        'pbs', 'warner bros', 'hbo', 'netflix', 'nbc', 'cbs', 'boomerang', 'adult swim',
+        'dreamworks', 'peacock kids', 'sesame'];
+      (data.items || []).forEach((v, i) => {
+        const t = (v.snippet && v.snippet.title) || '?';
+        const ch = (v.snippet && v.snippet.channelTitle) || '?';
+        const mins = isoDurationMinutes(v.contentDetails && v.contentDetails.duration) || 0;
+        const emb = !(v.status && v.status.embeddable === false);
+        const off = OFFICIAL.some((c) => ch.toLowerCase().indexOf(c) !== -1);
+        let verdict = '✅ would play';
+        if (!emb) verdict = '🚫 embedding OFF (network blocked outside playback)';
+        else if (!off) verdict = '🚫 not an official network channel';
+        else if (mins < runtime * 0.6) verdict = '🚫 too short (' + mins + 'm vs ~' + runtime + 'm ep)';
+        else if (mins > runtime * 2.2) verdict = '🚫 too long (' + mins + 'm)';
+        P((i + 1) + '. [' + ch + '] ' + t.slice(0, 60) + '\n   ' + mins + 'min · embeddable:' + (emb ? 'yes' : 'NO') + ' · ' + verdict);
+      });
+      P('— send a screenshot of this to fix the exact rule —');
+    } catch (e) { P('❌ DETAILS THREW: ' + e.message); }
+  }
+
   let ytLastStatus = ''; // why the last lookup found nothing (for the card hint)
   async function findYouTubeEpisode(show, episode) {
     ytLastStatus = '';
@@ -1876,16 +1931,19 @@
     current = el('yt-slot');
     if (!current || current !== slot) return;
     if (!ia) {
-      // Tell the person WHY there's no on-site player, instead of silence.
+      // Tell the person WHY there's no on-site player, instead of silence —
+      // and offer the full diagnostic with one tap.
+      let msg = '';
       if (ytLastStatus === 'embed-blocked') {
-        slot.innerHTML = '<span class="np-hint">ℹ️ This episode is on YouTube officially, but the network turned off embedding — use the button above.</span>';
+        msg = 'ℹ️ On YouTube officially, but the network turned off embedding — use the button above. ';
       } else if (ytLastStatus === 'quota') {
-        slot.innerHTML = '<span class="np-hint">ℹ️ YouTube lookups hit today\u2019s limit — back tomorrow. Streaming buttons still work.</span>';
+        msg = 'ℹ️ YouTube lookups hit today\u2019s limit — back tomorrow. ';
       } else if (ytLastStatus && ytLastStatus.indexOf('error') === 0) {
-        slot.innerHTML = '<span class="np-hint">⚠️ YouTube check failed (' + escapeHtml(ytLastStatus) + ')</span>';
-      } else {
-        slot.innerHTML = '';
+        msg = '⚠️ YouTube check failed (' + escapeHtml(ytLastStatus) + ') ';
       }
+      slot.innerHTML = '<span class="np-hint">' + msg + '<a href="#" id="yt-diag" style="color:var(--teal); text-decoration:underline;">🔬 diagnose</a></span>';
+      const d = el('yt-diag');
+      if (d) d.addEventListener('click', (ev) => { ev.preventDefault(); ytDiagnose(show, episode); });
       return;
     }
     if (autoplay && !userStoppedThis) { startArchivePlayback(show, episode, ia.id); return; }
