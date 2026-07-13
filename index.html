@@ -1500,6 +1500,18 @@
     } catch (e) { P('❌ DETAILS THREW: ' + e.message); }
   }
 
+  // Channels the user has blocked (bad edits, fake uploads). Never play from these.
+  let ytBlockedChannels = [];
+  try { ytBlockedChannels = JSON.parse(localStorage.getItem('cartoon-shuffler-yt-blocked') || '[]'); } catch (e) {}
+  function ytBlockChannel(channelId, channelTitle) {
+    if (channelId && ytBlockedChannels.indexOf(channelId) === -1) ytBlockedChannels.push(channelId);
+    try { localStorage.setItem('cartoon-shuffler-yt-blocked', JSON.stringify(ytBlockedChannels)); } catch (e) {}
+    // Wipe lookup caches so every episode re-checks without this channel.
+    ytDiskCache = {};
+    try { localStorage.removeItem('cartoon-shuffler-yt-cache'); } catch (e) {}
+    Object.keys(ytCache).forEach((k) => delete ytCache[k]);
+  }
+
   let ytLastStatus = ''; // why the last lookup found nothing (for the card hint)
   async function findYouTubeEpisode(show, episode) {
     ytLastStatus = '';
@@ -1549,6 +1561,7 @@
         let best = null, bestScore = 0, bestOfficial = false, bestHd = false, bestTitleEv = false;
         let sawBlockedOfficial = false;
         (data.items || []).forEach((v) => {
+          if (v.snippet && ytBlockedChannels.indexOf(v.snippet.channelId) !== -1) return; // user-blocked
           if (v.status && v.status.embeddable === false) {
             const bc = ((v.snippet && v.snippet.channelTitle) || '').toLowerCase();
             const OFF2 = ['disney', 'cartoon network', 'nickelodeon', 'nicktoons', 'nick jr',
@@ -1619,7 +1632,9 @@
           if (sawBlockedOfficial) ytLastStatus = 'embed-blocked';
           return null;
         }
-        return { videoId: best.id, title: best.snippet ? best.snippet.title : '' };
+        return { videoId: best.id, title: best.snippet ? best.snippet.title : '',
+                 channelId: best.snippet ? best.snippet.channelId : '',
+                 channelTitle: best.snippet ? best.snippet.channelTitle : '' };
       }
 
       // Round 1: search by season/episode number.
@@ -1671,6 +1686,11 @@
 
   // The one entry point for playing an episode on the site. Logs history,
   // remembers the "provider", and opens the theater.
+  // Remember which channel each played video came from (for the block button).
+  const ytVideoChannel = {};
+  function rememberChannel(found) {
+    if (found && found.videoId) ytVideoChannel[found.videoId] = { id: found.channelId || '', title: found.channelTitle || '' };
+  }
   function startSitePlayback(show, episode, videoId) {
     cancelPortal();
     stoppedEpKey = null; // playing again — clear the stop lock
@@ -1700,10 +1720,12 @@
     const root = document.createElement('div');
     root.className = 'theater-overlay';
     root.id = 'theater-root';
+    const chanInfo = ytVideoChannel[videoId] || null;
     root.innerHTML =
       '<div class="theater-top">' +
         '<span class="theater-title" id="theater-title">' + escapeHtml(theaterTitleText(show, episode)) + '</span>' +
         '<span style="display:flex; gap:8px; flex:0 0 auto;">' +
+          (chanInfo && chanInfo.id ? '<button class="btn btn-ghost btn-small" id="theater-block">🚫 Block channel</button>' : '') +
           (startAt > 0 ? '<button class="btn btn-ghost btn-small" id="theater-restart">↺ Start over</button>' : '') +
           '<button class="btn btn-ghost btn-small" id="theater-stop">✕ Stop watching</button>' +
         '</span>' +
@@ -1715,6 +1737,17 @@
     document.body.appendChild(root);
     theaterState = { show, episode, videoId };
     root.querySelector('#theater-stop').addEventListener('click', () => closeTheater(true));
+    const blockBtn = root.querySelector('#theater-block');
+    if (blockBtn) blockBtn.addEventListener('click', () => {
+      const ci = ytVideoChannel[videoId];
+      if (!ci) return;
+      if (!confirm('Block "' + (ci.title || 'this channel') + '"?\n\nVideos from it will never play on this site again.')) return;
+      ytBlockChannel(ci.id, ci.title);
+      closeTheater(false);
+      // Re-check this episode without the blocked channel.
+      const slot = el('yt-slot');
+      if (slot) attachYouTubeOption(show, episode);
+    });
     const restart = root.querySelector('#theater-restart');
     if (restart) restart.addEventListener('click', () => {
       if (theaterPlayer && theaterPlayer.seekTo) theaterPlayer.seekTo(0, true);
@@ -1808,6 +1841,7 @@
       if (!next || !theaterState) return;
       const found = await findYouTubeEpisode(next.show, next.episode);
       if (!theaterState) return; // theater closed meanwhile
+      rememberChannel(found);
       pendingNext = { show: next.show, episode: next.episode, videoId: found ? found.videoId : null };
     } catch (e) {}
   }
@@ -1871,6 +1905,7 @@
     const userStoppedThis = stoppedEpKey === thisKey;
     if (found) {
       if (document.getElementById('theater-root')) { slot.innerHTML = ''; return; } // already watching
+      rememberChannel(found);
       if (autoplay && !userStoppedThis) { startSitePlayback(show, episode, found.videoId); return; }
       renderYtButton(slot, show, episode, found.videoId);
       return;
@@ -2347,6 +2382,7 @@
         if (lastProviderName === WEBSITE_PROVIDER) {
           const found = await findYouTubeEpisode(show, episode);
           if (found) {
+            rememberChannel(found);
             startSitePlayback(show, episode, found.videoId);
             playedOnSite = true;
           }
