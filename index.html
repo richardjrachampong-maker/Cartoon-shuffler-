@@ -1488,6 +1488,13 @@
           if (!mins || mins < runtime * 0.6 || mins > runtime * 2.2) return;
           const title = ((v.snippet && v.snippet.title) || '').toLowerCase();
           const desc = ((v.snippet && v.snippet.description) || '').toLowerCase();
+          const chan0 = ((v.snippet && v.snippet.channelTitle) || '').toLowerCase();
+          // Hard reject: reaction/commentary/clip videos are never the episode.
+          const NOT_EPISODE = ['reaction', 'reacts', 'first time watching',
+            'blind watch', 'review', 'recap', 'breakdown', 'explained', 'analysis',
+            'commentary', 'theory', 'top 10', 'top ten', 'trailer', 'teaser', 'promo',
+            'behind the scenes', 'easter eggs', 'best moments', 'funniest moments'];
+          if (NOT_EPISODE.some((w) => title.indexOf(w) !== -1) || chan0.indexOf('reac') !== -1) return;
           let score = 0, epEvidence = false;
           if (sxe.some((p) => title.indexOf(p) !== -1)) { score += 3; epEvidence = true; }
           else if (sxe.some((p) => desc.indexOf(p) !== -1)) { score += 1; epEvidence = true; }
@@ -1700,6 +1707,10 @@
     } catch (e) {}
   }
 
+  // Set when the user deliberately stops on-site playback, so the play option
+  // comes back as a BUTTON instead of instantly auto-restarting the episode.
+  let suppressAutoOnce = false;
+
   function closeTheater(saveProgress) {
     if (theaterInterval) { clearInterval(theaterInterval); theaterInterval = null; }
     if (saveProgress) captureResume();
@@ -1710,7 +1721,10 @@
     const s = theaterState;
     theaterState = null;
     // Put the play button back on the card, and offer resume if applicable.
-    if (s) { const slot = el('yt-slot'); if (slot) attachYouTubeOption(s.show, s.episode); }
+    if (s) {
+      if (saveProgress) suppressAutoOnce = true; // they chose to stop — don't restart
+      const slot = el('yt-slot'); if (slot) attachYouTubeOption(s.show, s.episode);
+    }
     renderResumeChip();
   }
 
@@ -1798,7 +1812,8 @@
     if (!current || current !== slot) return; // a new shuffle replaced this card
     if (found) {
       if (document.getElementById('theater-root')) { slot.innerHTML = ''; return; } // already watching
-      if (autoplay) { startSitePlayback(show, episode, found.videoId); return; }
+      if (autoplay && !suppressAutoOnce) { startSitePlayback(show, episode, found.videoId); return; }
+      suppressAutoOnce = false; // consumed — next shuffle auto-plays again
       renderYtButton(slot, show, episode, found.videoId);
       return;
     }
@@ -1807,7 +1822,8 @@
     current = el('yt-slot');
     if (!current || current !== slot) return;
     if (!ia) { slot.innerHTML = ''; return; }
-    if (autoplay) { startArchivePlayback(show, episode, ia.id); return; }
+    if (autoplay && !suppressAutoOnce) { startArchivePlayback(show, episode, ia.id); return; }
+    suppressAutoOnce = false;
     slot.innerHTML = '<button class="yt-play-btn">▶ Play on this website</button>';
     slot.querySelector('.yt-play-btn').addEventListener('click', () => startArchivePlayback(show, episode, ia.id));
   }
