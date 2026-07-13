@@ -1837,24 +1837,8 @@
 
   // Show a "continue watching" button when the profile left an episode unfinished.
   function renderResumeChip() {
-    const np = el('np-content');
-    if (!np || !np.querySelector('.np-placeholder')) return;
-    const r = account && account.resume;
-    if (!r || !r.videoId) return;
-    const left = Math.max(0, (r.d || 0) - (r.t || 0));
-    if ((r.t || 0) < 30 || left < 60) return;
-    const mins = Math.max(1, Math.round(left / 60));
-    np.innerHTML =
-      '<div class="np-placeholder">— nothing queued up yet —</div>' +
-      '<div style="margin-top:12px;"><button class="yt-play-btn" id="resume-btn">⏯ Continue watching: ' +
-      escapeHtml(r.title) + ' S' + r.s + 'E' + r.e + ' · ' + mins + ' min left</button></div>';
-    el('resume-btn').addEventListener('click', () => {
-      const show = { tmdbId: r.tmdbId, title: r.title, avgRuntimeMin: r.runtime || 22, numberOfSeasons: 1 };
-      const episode = { season_number: r.s, episode_number: r.e, name: r.epName || '' };
-      lastProviderName = WEBSITE_PROVIDER;
-      saveLastProvider();
-      openTheater(show, episode, r.videoId, Math.floor(r.t));
-    });
+    // Continue-watching card removed by request. Resume data is still saved,
+    // so replaying the same episode on-site picks up where it left off.
   }
 
   function renderYtButton(slot, show, episode, videoId) {
