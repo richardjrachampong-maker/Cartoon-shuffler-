@@ -1171,12 +1171,48 @@
     });
   }
   async function sendPasswordChangeEmail() {
-    const email = (fbUser && fbUser.email) || account.email;
-    if (!email) { alert('No email on file for this account.'); return; }
+    if (!fbUser) { alert('You need to be logged in to change your password.'); return; }
+    const pw = prompt('Enter your NEW password (at least 6 characters):');
+    if (pw === null) return;
+    if (pw.length < 6) { alert('Password must be at least 6 characters.'); return; }
+    const pw2 = prompt('Type the new password again to confirm:');
+    if (pw2 === null) return;
+    if (pw !== pw2) { alert('The two passwords don\'t match — try again.'); return; }
     try {
-      await fbAuth.sendPasswordResetEmail(email);
-      alert('We sent a password-reset link to ' + email + '. Open it to set a new password.');
-    } catch (e) { alert('Couldn\'t send the reset email — please try again.'); }
+      await fbUser.updatePassword(pw);
+      alert('✅ Password changed. Use the new one next time you log in.');
+    } catch (e) {
+      if (e && e.code === 'auth/requires-recent-login') {
+        // Too long since login for a direct change — email a reset link instead.
+        const email = fbUser.email || account.email;
+        try {
+          await fbAuth.sendPasswordResetEmail(email);
+          alert('For security, Firebase needs a fresh login to change it directly — so we emailed a reset link to ' + email + '. Open it to set your new password. (Check spam too.)');
+        } catch (e2) { alert('Couldn\'t send the reset email: ' + (e2 && e2.message ? e2.message : 'unknown error')); }
+      } else {
+        alert('Couldn\'t change the password: ' + (e && e.message ? e.message : 'unknown error'));
+      }
+    }
+  }
+
+  // One-tap Google sign-in. Tries a popup; falls back to full-page redirect
+  // where popups are blocked (common on phones / installed PWAs).
+  async function fbGoogleSignIn() {
+    if (!fbEnabled) return;
+    const provider = new firebase.auth.GoogleAuthProvider();
+    try {
+      await fbAuth.signInWithPopup(provider);
+      el('account-bubble').style.display = 'none';
+    } catch (e) {
+      const c = (e && e.code) || '';
+      if (c.indexOf('popup') !== -1 || c.indexOf('cancelled') !== -1) {
+        try { await fbAuth.signInWithRedirect(provider); } catch (e2) {}
+      } else if (c.indexOf('unauthorized-domain') !== -1) {
+        alert('This site isn\'t authorized for Google sign-in yet — add this domain in Firebase → Authentication → Authorized domains.');
+      } else if (c.indexOf('operation-not-allowed') !== -1) {
+        alert('Google sign-in isn\'t enabled yet — turn it on in Firebase → Authentication → Sign-in method → Google.');
+      }
+    }
   }
   el('settings-open').addEventListener('click', openSettings);
   el('settings-close').addEventListener('click', closeSettings);
@@ -2730,11 +2766,14 @@
         '<div class="bubble-actions">' +
           '<button class="btn btn-small" id="fb-signup-btn">Create account</button>' +
           '<button class="btn btn-ghost btn-small" id="fb-signin-btn">Sign in</button>' +
+          '<button class="btn btn-ghost btn-small" id="fb-google-bubble">🔵 Continue with Google</button>' +
           '<button class="btn btn-ghost btn-small" id="bubble-later-btn">Keep browsing</button>' +
         '</div>';
       el('account-bubble').style.display = 'block';
       el('fb-signup-btn').addEventListener('click', () => showAuthForm('signup'));
       el('fb-signin-btn').addEventListener('click', () => showAuthForm('signin'));
+      const g = el('fb-google-bubble');
+      if (g) g.addEventListener('click', fbGoogleSignIn);
       el('bubble-later-btn').addEventListener('click', dismissBubble);
       return;
     }
@@ -2763,12 +2802,14 @@
       '<div class="error-msg" id="fb-error" style="display:none; margin-top:6px;"></div>' +
       '<div class="bubble-actions">' +
         '<button class="btn btn-small" id="fb-go">' + (signup ? 'Create account' : 'Log in') + '</button>' +
+        '<button class="btn btn-ghost btn-small" id="fb-google">🔵 Continue with Google</button>' +
         (signup ? '' : '<button class="btn btn-ghost btn-small" id="fb-forgot">Forgot password?</button>') +
         '<button class="btn btn-ghost btn-small" id="fb-switch">' + (signup ? 'I already have an account' : 'Create an account') + '</button>' +
       '</div>' +
       '<div class="bubble-fineprint">Your shows sync securely to the cloud and to any device you log in on.</div>';
     el('fb-id').focus();
     el('fb-switch').addEventListener('click', () => showAuthForm(signup ? 'signin' : 'signup'));
+    el('fb-google').addEventListener('click', fbGoogleSignIn);
     const err = el('fb-error');
     const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
     const ok = (m) => { err.style.color = 'var(--teal)'; err.textContent = m; err.style.display = 'block'; };
@@ -3140,6 +3181,7 @@
     // With Firebase on, auth state decides sign-in; auto-loads a returning user.
     if (fbEnabled) {
       fbAuth.onAuthStateChanged(fbOnUser);
+      fbAuth.getRedirectResult().catch(() => {}); // finish Google redirect sign-ins
       if (!bubbleDismissed) {
         setTimeout(() => { if (!fbUser) showAccountBubble(); }, 2500);
       }
