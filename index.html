@@ -1204,6 +1204,25 @@
   el('search-btn').addEventListener('click', doSearch);
   el('search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch(); });
 
+  // Live suggestions: search as they type (after 2+ letters), lightly debounced
+  // so we don't fire a request per keystroke. Results appear without pressing
+  // the button; the newest keystroke always wins over slow older responses.
+  let searchDebounce = null;
+  let searchSeq = 0;
+  el('search-input').addEventListener('input', () => {
+    clearTimeout(searchDebounce);
+    const q = el('search-input').value.trim();
+    if (q.length < 2) { el('search-results').innerHTML = ''; return; }
+    searchDebounce = setTimeout(async () => {
+      const mySeq = ++searchSeq;
+      try {
+        const results = await searchShows(q);
+        if (mySeq !== searchSeq) return; // a newer keystroke superseded this
+        renderSearchResults(results);
+      } catch (e) { /* quiet while typing; the button still surfaces errors */ }
+    }, 300);
+  });
+
   async function doSearch() {
     const q = el('search-input').value.trim();
     el('search-error').textContent = '';
@@ -2210,7 +2229,8 @@
         const label = isPrimary ? ('▶ Watch on ' + p.provider_name) : p.provider_name;
         return '<a class="' + cls + '" href="' + url + '" target="_blank" rel="noopener" data-runtime="' + (episode.displayRuntime || episode.runtime || show.avgRuntimeMin) + '" data-provider="' + escapeHtml(p.provider_name) + '">' + escapeHtml(label) + '</a>';
       };
-      providerHtml = '<div class="watch-primary">' + anchor(primary, true) + '</div>';
+      providerHtml = '<div class="watch-primary">' + anchor(primary, true) +
+        '<div class="np-hint" style="margin-top:8px;">👆 Click here to play this episode</div></div>';
       if (rest.length) {
         providerHtml += '<details class="other-services"><summary>Other ways to watch</summary><div class="providers">' +
           rest.map(function (p) { return anchor(p, false); }).join('') + '</div></details>';
