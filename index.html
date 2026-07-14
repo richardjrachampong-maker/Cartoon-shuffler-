@@ -590,6 +590,7 @@
   // Without a key, the app works exactly as before (streaming buttons only).
   // With a key, episodes that exist on YouTube get a "Play on this website" button.
   const YT_API_KEY = 'AIzaSyCHD0JsouP06oGE2Sdam24TSpDw0u0-i8Q';
+  let ytKey = YT_API_KEY;
   // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
 
   // ▼▼▼ AUTOMATIC DEEP LINKS (Watchmode) ▼▼▼
@@ -1153,6 +1154,7 @@
     html += '<div class="settings-section"><h3>Streaming</h3>' +
       '<button class="btn btn-ghost btn-small" id="set-services">📺 My services</button></div>';
 
+
     el('settings-body').innerHTML = html;
 
     const bind = (id, fn) => { const b = el(id); if (b) b.addEventListener('click', fn); };
@@ -1434,7 +1436,7 @@
   const YT_DAILY_BUDGET = 9000; // leave headroom under the 10k cap
   const YT_SEARCH_COST = 100, YT_VIDEOS_COST = 1;
   function ytToday() { return new Date().toISOString().slice(0, 10); }
-  const YT_KEY_TAG = YT_API_KEY.slice(-6); // usage resets if the key changes
+  const YT_KEY_TAG = ytKey.slice(-6); // usage resets if the key changes
   function ytUsage() {
     try {
       const u = JSON.parse(localStorage.getItem('cartoon-shuffler-yt-usage') || '{}');
@@ -1452,9 +1454,20 @@
     u.dead = true;
     try { localStorage.setItem('cartoon-shuffler-yt-usage', JSON.stringify(u)); } catch (e) {}
   }
+  // Pace the day's quota across 8am-10pm so it can't all be devoured in one
+  // morning burst: at any moment, only the share of the budget "unlocked" by
+  // the clock may be spent. A floor keeps early-morning use working, and
+  // whatever an hour doesn't use rolls into the next.
   function ytBudgetOk() {
     const u = ytUsage();
-    return !u.dead && u.u < YT_DAILY_BUDGET;
+    if (u.dead) return false;
+    const now = new Date();
+    const h = now.getHours() + now.getMinutes() / 60;
+    const START = 8, END = 22; // pace between 8am and 10pm local time
+    let frac = (h - START) / (END - START);
+    frac = Math.max(0, Math.min(1, frac));
+    const allowedByNow = Math.max(800, Math.floor(YT_DAILY_BUDGET * frac));
+    return u.u < allowedByNow;
   }
   // Results persist for 14 days so a repeat episode never spends quota again.
   let ytDiskCache = {};
@@ -1483,16 +1496,17 @@
     const out = [];
     const P = (t) => { out.push(t); slot.innerHTML = '<div class="np-hint" style="text-align:left; font-family:monospace; font-size:0.68rem; white-space:pre-wrap;">' + out.map(escapeHtml).join('\n') + '</div>'; };
     P('🔬 YouTube diagnostic');
-    P('key: ' + (YT_API_KEY ? YT_API_KEY.slice(0, 8) + '… (' + YT_API_KEY.length + ' chars)' : 'MISSING'));
+    P('key: ' + (ytKey ? ytKey.slice(0, 8) + '… (' + ytKey.length + ' chars)' : 'MISSING'));
     const u = ytUsage();
-    P('quota today: ' + u.u + ' units used' + (u.dead ? ' — MARKED EXHAUSTED' : ''));
-    if (!YT_API_KEY) return;
+    P('quota today: ' + u.u + ' units used' + (u.dead ? ' — MARKED EXHAUSTED' : '') +
+      (ytBudgetOk() ? '' : ' — paced: more unlocks as the day goes on'));
+    if (!ytKey) return;
     const q = show.title + ' season ' + episode.season_number + ' episode ' + episode.episode_number + ' full episode';
     P('search: "' + q + '"');
     let items = [];
     try {
       ytSpend(YT_SEARCH_COST);
-      const res = await fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&safeSearch=moderate&maxResults=8&q=' + encodeURIComponent(q) + '&key=' + YT_API_KEY);
+      const res = await fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&safeSearch=moderate&maxResults=8&q=' + encodeURIComponent(q) + '&key=' + ytKey);
       const body = await res.json();
       if (!res.ok) {
         const er = (body.error && body.error.errors && body.error.errors[0]) || {};
@@ -1505,7 +1519,7 @@
     if (!items.length) { P('(nothing came back for that query)'); return; }
     try {
       ytSpend(YT_VIDEOS_COST);
-      const res2 = await fetch('https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=' + items.join(',') + '&key=' + YT_API_KEY);
+      const res2 = await fetch('https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=' + items.join(',') + '&key=' + ytKey);
       const data = await res2.json();
       if (!res2.ok) { P('❌ DETAILS FAILED — HTTP ' + res2.status); return; }
       const runtime = episode.displayRuntime || episode.runtime || show.avgRuntimeMin || 22;
@@ -1564,7 +1578,7 @@
       for (let page = 0; page < 12; page++) { // up to 600 newest uploads, 12 units
         ytSpend(1);
         const res = await fetch('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=' + uploads +
-          (pageToken ? '&pageToken=' + pageToken : '') + '&key=' + YT_API_KEY);
+          (pageToken ? '&pageToken=' + pageToken : '') + '&key=' + ytKey);
         if (!res.ok) break;
         const data = await res.json();
         (data.items || []).forEach((i) => {
@@ -1605,13 +1619,20 @@
 
   async function findYouTubeEpisode(show, episode) {
     ytLastStatus = '';
-    if (!YT_API_KEY) { ytLastStatus = 'no-key'; return null; }
+    if (!ytKey) { ytLastStatus = 'no-key'; return null; }
     const cacheKey = show.tmdbId + '-' + episode.season_number + '-' + episode.episode_number;
     if (cacheKey in ytCache) return ytCache[cacheKey];
     const disk = ytCacheGet(cacheKey);
     if (disk !== undefined) { ytCache[cacheKey] = disk; return disk; }
     // Out of budget for today — skip fresh searches, cached episodes still play.
     if (!ytBudgetOk()) { ytLastStatus = 'quota'; return null; }
+    // Strike-out: this show has repeatedly turned up nothing on YouTube, so
+    // stop spending quota on it for a week. Resets on any success.
+    const listShow0 = list.find((x) => x.tmdbId === show.tmdbId);
+    if (listShow0 && listShow0.ytMisses >= 3 &&
+        (Date.now() - (listShow0.ytMissAt || 0)) < 7 * 24 * 60 * 60 * 1000) {
+      return null;
+    }
     try {
       // Cheap path first: match inside the show's known official channel.
       const viaCatalog = await catalogLookup(show, episode);
@@ -1624,13 +1645,15 @@
       const s = episode.season_number, e = episode.episode_number;
       const epName = (episode.name || '').toLowerCase();
       const showStart = show.title.toLowerCase().slice(0, 12);
-      const sxe = ['s' + pad2(s) + 'e' + pad2(e), 's' + s + 'e' + e, s + 'x' + pad2(e), 'season ' + s + ' episode ' + e, 'season ' + s + ', episode ' + e];
+      const sxe = ['s' + pad2(s) + 'e' + pad2(e), 's' + s + 'e' + e, s + 'x' + pad2(e),
+        's' + s + ' e' + e, 's' + pad2(s) + ' e' + pad2(e), // Disney-style "S1 E10"
+        'season ' + s + ' episode ' + e, 'season ' + s + ', episode ' + e];
 
       async function ytSearch(q) {
         ytSpend(YT_SEARCH_COST);
         const res = await fetch(
           'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&safeSearch=moderate&maxResults=8' +
-          '&q=' + encodeURIComponent(q) + '&key=' + YT_API_KEY
+          '&q=' + encodeURIComponent(q) + '&key=' + ytKey
         );
         if (!res.ok) {
           let reason = '';
@@ -1646,7 +1669,7 @@
         if (!ids.length) return null;
         ytSpend(YT_VIDEOS_COST);
         const res = await fetch(
-          'https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=' + ids.join(',') + '&key=' + YT_API_KEY
+          'https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=' + ids.join(',') + '&key=' + ytKey
         );
         if (!res.ok) {
           let reason = '';
@@ -1681,6 +1704,9 @@
             'behind the scenes', 'easter eggs', 'best moments', 'funniest moments',
             'screen record', 'cam rip', 'camrip', 'low quality', 'bad quality'];
           if (NOT_EPISODE.some((w) => title.indexOf(w) !== -1) || chan0.indexOf('reac') !== -1) return;
+          // The video's title MUST name this show. Without this, "Gravity Falls
+          // S1 E3" can pass for ANY show's S1E3 — the wrong-show bug.
+          if (title.indexOf(showStart) === -1) return;
           let score = 0, epEvidence = false, titleEvidence = false;
           const isHd = !!(v.contentDetails && v.contentDetails.definition === 'hd');
           if (sxe.some((p) => title.indexOf(p) !== -1)) { score += 3; epEvidence = true; titleEvidence = true; }
@@ -1751,6 +1777,15 @@
       }
       ytCache[cacheKey] = result;
       ytCacheSet(cacheKey, result); // survives reloads — repeats cost no quota
+      const listShow1 = list.find((x) => x.tmdbId === show.tmdbId);
+      if (listShow1) {
+        if (result) { listShow1.ytMisses = 0; }
+        else {
+          listShow1.ytMisses = (listShow1.ytMisses || 0) + 1;
+          listShow1.ytMissAt = Date.now();
+        }
+        saveList();
+      }
       if (result && result.channelId && !show.ytChannelId) {
         // Remember the channel: every future episode of this show now uses the
         // 1-unit catalog path instead of 100-unit searches.
@@ -2001,8 +2036,8 @@
   async function attachYouTubeOption(show, episode) {
     const slot = el('yt-slot');
     if (!slot) return;
-    if (YT_API_KEY) slot.innerHTML = '<span class="np-hint">🔎 checking for a free copy…</span>';
-    const found = YT_API_KEY ? await findYouTubeEpisode(show, episode) : null;
+    if (ytKey) slot.innerHTML = '<span class="np-hint">🔎 checking for a free copy…</span>';
+    const found = ytKey ? await findYouTubeEpisode(show, episode) : null;
     let current = el('yt-slot');
     if (!current || current !== slot) return; // a new shuffle replaced this card
     const thisKey = epKey(show.tmdbId, episode.season_number, episode.episode_number);
