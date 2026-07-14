@@ -1543,6 +1543,66 @@
   }
 
   let ytLastStatus = ''; // why the last lookup found nothing (for the card hint)
+  // ---------- Channel catalogs: the cheap path ----------
+  // A YouTube SEARCH costs 100 quota units; reading a channel's upload list
+  // costs 1 unit per 50 videos. Once we know a show's official channel, we
+  // pull its catalog cheaply and match future episodes locally — same daily
+  // quota, roughly 100x more lookups.
+  let ytCatalogs = {};
+  try { ytCatalogs = JSON.parse(localStorage.getItem('cartoon-shuffler-yt-catalogs') || '{}'); } catch (e) {}
+  function catSave() {
+    try { localStorage.setItem('cartoon-shuffler-yt-catalogs', JSON.stringify(ytCatalogs)); }
+    catch (e) { ytCatalogs = {}; } // storage full — drop and rebuild smaller
+  }
+  async function getChannelCatalog(channelId) {
+    const hit = ytCatalogs[channelId];
+    if (hit && (Date.now() - hit.t) < 7 * 24 * 60 * 60 * 1000) return hit.v;
+    const uploads = 'UU' + channelId.slice(2); // channel's uploads playlist
+    const vids = [];
+    let pageToken = '';
+    try {
+      for (let page = 0; page < 12; page++) { // up to 600 newest uploads, 12 units
+        ytSpend(1);
+        const res = await fetch('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=' + uploads +
+          (pageToken ? '&pageToken=' + pageToken : '') + '&key=' + YT_API_KEY);
+        if (!res.ok) break;
+        const data = await res.json();
+        (data.items || []).forEach((i) => {
+          const sn = i.snippet || {};
+          const vid = sn.resourceId && sn.resourceId.videoId;
+          if (vid) vids.push({ id: vid, t: (sn.title || '') });
+        });
+        pageToken = data.nextPageToken || '';
+        if (!pageToken) break;
+      }
+    } catch (e) { /* partial catalog is still useful */ }
+    if (vids.length) { ytCatalogs[channelId] = { v: vids, t: Date.now() }; catSave(); }
+    return vids;
+  }
+  // Try to match this episode inside a known channel's catalog. On a title hit,
+  // one 1-unit details call verifies length/embeddability with the full rules.
+  async function catalogLookup(show, episode) {
+    if (!show.ytChannelId) return null;
+    const vids = await getChannelCatalog(show.ytChannelId);
+    if (!vids || !vids.length) return null;
+    const sNum = episode.season_number, eNum = episode.episode_number;
+    const epName = (episode.name || '').toLowerCase();
+    const pairName = (episode.pairEp && episode.pairEp.name || '').toLowerCase();
+    const showT = show.title.toLowerCase();
+    const sxe = ['s' + pad2(sNum) + 'e' + pad2(eNum), 's' + sNum + 'e' + eNum,
+      sNum + 'x' + eNum, 'season ' + sNum + ' episode ' + eNum,
+      's' + sNum + ' e' + eNum];
+    const cand = vids.filter((v) => {
+      const t = v.t.toLowerCase();
+      if (t.indexOf(showT) === -1) return false;
+      return sxe.some((p) => t.indexOf(p) !== -1) ||
+        (epName.length > 3 && t.indexOf(epName) !== -1) ||
+        (pairName.length > 3 && t.indexOf(pairName) !== -1);
+    }).slice(0, 8).map((v) => v.id);
+    if (!cand.length) return null;
+    return bestMatch(cand, true);
+  }
+
   async function findYouTubeEpisode(show, episode) {
     ytLastStatus = '';
     if (!YT_API_KEY) { ytLastStatus = 'no-key'; return null; }
@@ -1553,6 +1613,13 @@
     // Out of budget for today — skip fresh searches, cached episodes still play.
     if (!ytBudgetOk()) { ytLastStatus = 'quota'; return null; }
     try {
+      // Cheap path first: match inside the show's known official channel.
+      const viaCatalog = await catalogLookup(show, episode);
+      if (viaCatalog) {
+        ytCache[cacheKey] = viaCatalog;
+        ytCacheSet(cacheKey, viaCatalog);
+        return viaCatalog;
+      }
       const runtime = show.avgRuntimeMin || 22;
       const s = episode.season_number, e = episode.episode_number;
       const epName = (episode.name || '').toLowerCase();
@@ -1684,6 +1751,13 @@
       }
       ytCache[cacheKey] = result;
       ytCacheSet(cacheKey, result); // survives reloads — repeats cost no quota
+      if (result && result.channelId && !show.ytChannelId) {
+        // Remember the channel: every future episode of this show now uses the
+        // 1-unit catalog path instead of 100-unit searches.
+        const listShow = list.find((x) => x.tmdbId === show.tmdbId);
+        if (listShow) { listShow.ytChannelId = result.channelId; saveList(); }
+        show.ytChannelId = result.channelId;
+      }
       return result;
     } catch (err) {
       console.warn('YouTube lookup skipped:', err);
