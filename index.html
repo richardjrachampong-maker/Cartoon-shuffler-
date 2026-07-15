@@ -1471,7 +1471,11 @@
   // the budget runs out instead of failing all day.
   const YT_DAILY_BUDGET = 9000; // leave headroom under the 10k cap
   const YT_SEARCH_COST = 100, YT_VIDEOS_COST = 1;
-  function ytToday() { return new Date().toISOString().slice(0, 10); }
+  function ytToday() {
+    // Google's quota resets at midnight PACIFIC time — track the same day.
+    try { return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }); }
+    catch (e) { return new Date().toISOString().slice(0, 10); }
+  }
   const YT_KEY_TAG = ytKey.slice(-6); // usage resets if the key changes
   function ytUsage() {
     try {
@@ -1569,11 +1573,20 @@
         const mins = isoDurationMinutes(v.contentDetails && v.contentDetails.duration) || 0;
         const emb = !(v.status && v.status.embeddable === false);
         const off = OFFICIAL.some((c) => ch.toLowerCase().indexOf(c) !== -1);
+        const tl = t.toLowerCase();
+        const epn = (episode.name || '').toLowerCase();
+        const prn = (episode.pairEp && episode.pairEp.name || '').toLowerCase();
+        const sxeD = ['s' + episode.season_number + 'e' + episode.episode_number,
+          's' + episode.season_number + ' e' + episode.episode_number,
+          'season ' + episode.season_number + ' episode ' + episode.episode_number];
+        const proof = sxeD.some((p) => tl.indexOf(p) !== -1) ||
+          (epn.length > 3 && tl.indexOf(epn) !== -1) || (prn.length > 3 && tl.indexOf(prn) !== -1);
         let verdict = '✅ would play';
         if (!emb) verdict = '🚫 embedding OFF (network blocked outside playback)';
         else if (!off) verdict = '🚫 not an official network channel';
         else if (mins < runtime * 0.6) verdict = '🚫 too short (' + mins + 'm vs ~' + runtime + 'm ep)';
         else if (mins > runtime * 2.2) verdict = '🚫 too long (' + mins + 'm)';
+        else if (!proof) verdict = '🚫 no proof it\'s THIS episode (name/number not in title)';
         P((i + 1) + '. [' + ch + '] ' + t.slice(0, 60) + '\n   ' + mins + 'min · embeddable:' + (emb ? 'yes' : 'NO') + ' · ' + verdict);
       });
       P('— send a screenshot of this to fix the exact rule —');
