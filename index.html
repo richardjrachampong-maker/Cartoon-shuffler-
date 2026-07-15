@@ -1796,21 +1796,15 @@
                  channelTitle: best.snippet ? best.snippet.channelTitle : '' };
       }
 
-      // Round 1: search by season/episode number.
-      let result = await bestMatch(await ytSearch(
-        show.title + ' season ' + s + ' episode ' + e + ' full episode'
-      ));
-      // Round 2: search by episode NAME — catches videos titled after a paired
-      // segment (e.g. two 11-min cartoons uploaded as one video under the
-      // other segment's title, with this one named in the description).
-      if (!result && episode.name) {
-        result = await bestMatch(await ytSearch(show.title + ' ' + episode.name + ' full episode'), true);
-      }
-      // Round 3: same, using the paired segment's name (networks often title
-      // the combined upload after the OTHER half).
-      if (!result && episode.pairEp && episode.pairEp.name) {
-        result = await bestMatch(await ytSearch(show.title + ' ' + episode.pairEp.name + ' full episode'), true);
-      }
+      // ONE search per new episode — hard cap. The query combines the episode
+      // number AND its name(s), so a single 100-unit call covers uploads titled
+      // either way. Matching still enforces every rule (show name in title,
+      // official channel, no contradictions, length, embeddable).
+      let q = show.title + ' s' + s + ' e' + e;
+      if (episode.name) q += ' ' + episode.name;
+      if (episode.pairEp && episode.pairEp.name) q += ' ' + episode.pairEp.name;
+      q += ' full episode';
+      let result = await bestMatch(await ytSearch(q), true);
       ytCache[cacheKey] = result;
       ytCacheSet(cacheKey, result); // survives reloads — repeats cost no quota
       const listShow1 = list.find((x) => x.tmdbId === show.tmdbId);
