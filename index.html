@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Show Shuffler — Can't pick? Shuffle a random episode to watch</title>
 <meta name="description" content="Show Shuffler picks a random episode from your favorite shows and takes you straight to it on Netflix, Hulu, Disney+ and more — or plays it right here when it's free on YouTube.">
+<!-- Favicon (browser tab) + iPhone home-screen icon -->
+<link rel="icon" type="image/png" sizes="48x48" href="logo-tv-48.png">
+<link rel="icon" type="image/png" sizes="192x192" href="logo-tv-192.png">
+<link rel="apple-touch-icon" href="logo-tv-192.png">
+<meta name="theme-color" content="#0A0B14">
 <!-- ▼ SEO: domain: showshuffle.live ▼ -->
 <link rel="canonical" href="https://showshuffle.live/">
 <meta property="og:type" content="website">
@@ -709,6 +714,15 @@
     Show + streaming-availability data via TMDB. Availability reflects TMDB's own watch-provider data (sourced from JustWatch) and may not always be complete or current.<br/>
     The countdown timer is based on the show's average runtime, not real playback — this app can't see what happens inside another site's video player.
     <span id="footer-restore" style="display:none;"><br/><a href="#" id="footer-restore-link" style="color: var(--teal);">Have an account on another device? Log in with your transfer code or backup email →</a></span>
+    <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border); display:flex; flex-wrap:wrap; gap:6px 14px; align-items:center; justify-content:center;">
+      <span style="font-weight:700; color:var(--text);">Show Shuffler</span>
+      <span style="opacity:0.5;">·</span>
+      <a href="about.html" style="color:var(--text-dim);">About</a>
+      <a href="privacy.html" style="color:var(--text-dim);">Privacy</a>
+      <a href="terms.html" style="color:var(--text-dim);">Terms</a>
+      <span style="opacity:0.5;">·</span>
+      <span style="color:var(--text-dim);">© 2026 Show Shuffler</span>
+    </div>
   </footer>
 </div>
 
@@ -2881,13 +2895,37 @@
     renderResumeChip();
   }
 
+  function deleteProfile(i) {
+    if (i < 0 || i >= profiles.length) return;
+    if (profiles.length <= 1) { alert("You can't delete your only profile."); return; }
+    const nm = profiles[i].name || 'this profile';
+    if (!confirm('Delete "' + nm + '"?\n\nIts show list, history, and watched memory will be permanently removed from this device. This can\'t be undone.')) return;
+    profiles.splice(i, 1);
+    // Fix the active pointer so we stay on a valid profile.
+    if (activeProfile === i) {
+      activeProfile = 0;
+      const p = profiles[0];
+      account = p; list = p.list; history = p.history; recent = p.recent; sessionSeen = [];
+    } else if (activeProfile > i) {
+      activeProfile -= 1;
+    }
+    saveProfiles();
+    renderList(); renderHistory(); renderGreeting();
+    el('np-content').innerHTML = '<div class="np-placeholder">— nothing queued up yet —</div>';
+    resetTimer(); renderResumeChip();
+    showProfilesDialog(); // refresh the list
+  }
+
   function showProfilesDialog() {
     let rows = '';
     profiles.forEach((p, i) => {
       const label = p.name ? escapeHtml(p.name) : '(unnamed)';
       const mark = i === activeProfile ? ' ✓' : '';
-      rows += '<button class="btn btn-small" data-profile="' + i + '" style="width:100%; margin-bottom:8px;">' +
-        '👤 ' + label + mark + ' <span style="opacity:0.7; font-weight:400;">· ' + (p.list ? p.list.length : 0) + ' shows</span></button>';
+      rows += '<div style="display:flex; gap:6px; margin-bottom:8px; align-items:stretch;">' +
+        '<button class="btn btn-small" data-profile="' + i + '" style="flex:1;">' +
+          '👤 ' + label + mark + ' <span style="opacity:0.7; font-weight:400;">· ' + (p.list ? p.list.length : 0) + ' shows</span></button>' +
+        (profiles.length > 1 ? '<button class="btn btn-ghost btn-small" data-delprofile="' + i + '" aria-label="Delete ' + label + '" style="flex:0 0 auto;">🗑</button>' : '') +
+        '</div>';
     });
     el('bubble-inner').innerHTML =
       '<div class="bubble-title">Who\'s watching? 👀</div>' +
@@ -2901,6 +2939,12 @@
       btn.addEventListener('click', () => {
         switchProfile(parseInt(btn.getAttribute('data-profile'), 10));
         el('account-bubble').style.display = 'none';
+      });
+    });
+    el('bubble-inner').querySelectorAll('[data-delprofile]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteProfile(parseInt(btn.getAttribute('data-delprofile'), 10));
       });
     });
     el('add-profile-btn').addEventListener('click', showAddProfileForm);
