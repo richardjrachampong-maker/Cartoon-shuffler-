@@ -683,39 +683,39 @@
     flex-direction: column; align-items: center; justify-content: center;
     padding: 30px 18px;
     background:
-      radial-gradient(circle at 20% 15%, rgba(178,150,255,0.5), transparent 45%),
-      radial-gradient(circle at 82% 20%, rgba(255,150,200,0.42), transparent 45%),
-      radial-gradient(circle at 50% 95%, rgba(150,220,255,0.4), transparent 55%),
-      linear-gradient(160deg, #efeaff, #ffeef6 55%, #eafaff);
+      radial-gradient(circle at 20% 12%, rgba(124,92,255,0.28), transparent 46%),
+      radial-gradient(circle at 84% 18%, rgba(255,62,127,0.20), transparent 44%),
+      radial-gradient(circle at 50% 96%, rgba(34,211,180,0.12), transparent 52%),
+      #07080F;
     animation: onbIn 0.6s ease;
   }
   @keyframes onbIn { from { opacity: 0; } to { opacity: 1; } }
   #onboard .onb-head { text-align: center; margin-bottom: 22px; }
-  #onboard .onb-head h2 { font-family: 'Sora', sans-serif; font-weight: 800; font-size: clamp(1.5rem,5vw,2.1rem); color: #1a1330; margin: 0 0 6px; }
-  #onboard .onb-head p { color: #5b4d78; font-size: 0.95rem; margin: 0; font-weight: 500; }
-  #onboard .onb-count { color: #7c5cff; font-weight: 700; }
+  #onboard .onb-head h2 { font-family: 'Sora', sans-serif; font-weight: 800; font-size: clamp(1.5rem,5vw,2.1rem); color: #F4F1FF; margin: 0 0 6px; }
+  #onboard .onb-head p { color: var(--text-dim); font-size: 0.95rem; margin: 0; font-weight: 500; }
+  #onboard .onb-count { color: #a68bff; font-weight: 700; }
   .onb-strip-wrap {
     width: 100%; max-width: 760px;
-    background: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.7);
+    background: rgba(20,22,42,0.55); border: 1px solid rgba(255,255,255,0.12);
     border-radius: 24px; padding: 18px 14px;
-    box-shadow: 0 20px 60px rgba(120,90,180,0.25), inset 0 1px 0 rgba(255,255,255,0.9);
-    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+    box-shadow: 0 24px 70px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.10);
+    -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
   }
   .onb-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   .onb-strip::-webkit-scrollbar { display: none; }
   .onb-card { flex: 0 0 auto; width: 128px; cursor: pointer; text-align: center; }
-  .onb-poster { width: 128px; aspect-ratio: 2/3; border-radius: 14px; overflow: hidden; position: relative; box-shadow: 0 8px 22px rgba(80,60,120,0.28); border: 2px solid transparent; transition: transform .18s ease, border-color .18s ease; }
+  .onb-poster { width: 128px; aspect-ratio: 2/3; border-radius: 14px; overflow: hidden; position: relative; box-shadow: 0 10px 26px rgba(0,0,0,0.45); border: 2px solid transparent; transition: transform .18s ease, border-color .18s ease; }
   .onb-card:hover .onb-poster { transform: translateY(-4px); }
-  .onb-poster.added { border-color: #22c39c; }
+  .onb-poster.added { border-color: var(--teal); }
   .onb-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .onb-tag { position: absolute; left: 8px; right: 8px; bottom: 8px; border-radius: 9px; font-weight: 800; font-size: 0.78rem; padding: 6px 0; background: rgba(15,12,30,0.72); color: #fff; }
-  .onb-tag.added { background: rgba(34,195,156,0.95); color: #04231d; }
-  .onb-cname { font-size: 0.74rem; color: #3f3358; margin-top: 6px; font-weight: 600; line-height: 1.15; }
+  .onb-tag { position: absolute; left: 8px; right: 8px; bottom: 8px; border-radius: 9px; font-weight: 800; font-size: 0.78rem; padding: 6px 0; background: rgba(7,8,15,0.78); color: #fff; backdrop-filter: blur(4px); }
+  .onb-tag.added { background: rgba(34,211,180,0.95); color: #04231d; }
+  .onb-cname { font-size: 0.74rem; color: var(--text-dim); margin-top: 6px; font-weight: 600; line-height: 1.15; }
   .onb-actions { position: fixed; left: 0; right: 0; bottom: 26px; display: flex; justify-content: space-between; padding: 0 24px; }
-  .onb-btn { border: none; border-radius: 40px; padding: 13px 26px; font-family: 'Sora', sans-serif; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 10px 26px rgba(80,60,120,0.28); }
-  .onb-back { background: rgba(255,255,255,0.8); color: #3f3358; }
-  .onb-continue { background: linear-gradient(135deg, #7c5cff, #ff5c9d); color: #fff; }
-  .onb-continue:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+  .onb-btn { border: none; border-radius: 40px; padding: 13px 26px; font-family: 'Sora', sans-serif; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 10px 26px rgba(0,0,0,0.4); }
+  .onb-back { background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid rgba(255,255,255,0.14); }
+  .onb-continue { background: linear-gradient(135deg, #7c5cff, #ff5c9d); color: #fff; box-shadow: 0 10px 26px rgba(124,92,255,0.4); }
+  .onb-continue:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 
   /* Profile setup card shown centered on the splash */
   #splash-setup {
@@ -820,8 +820,6 @@
 <!-- Glassy welcome / about modal for new & logged-out visitors -->
 <div id="welcome-modal">
   <div class="wm-card">
-    <div class="wm-cartoons-head">Get your list started 🎬</div>
-    <div class="wm-cartoon-strip" id="wm-cartoon-strip"></div>
     <img src="logo-tv-192.png" alt="Show Shuffler" class="wm-logo" onerror="this.style.display='none'">
     <h2>Welcome to Show Shuffler</h2>
     <p class="wm-sub">Can't decide what to watch? Add the shows you love, hit shuffle, and land on a random episode — instantly.</p>
@@ -1737,7 +1735,6 @@
     // Show for anyone not signed in who hasn't seen it. Signed-in users skip it.
     if (seen || (fbEnabled && fbUser)) return;
     el('welcome-modal').style.display = 'flex';
-    renderWelcomeCartoons();
   }
   function dismissWelcome() {
     el('welcome-modal').style.display = 'none';
