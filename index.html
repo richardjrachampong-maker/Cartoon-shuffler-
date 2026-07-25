@@ -572,15 +572,39 @@
   .network-strip::-webkit-scrollbar { display: none; }
   .network-chip {
     flex: 0 0 auto; border: 1px solid var(--border); background: var(--bg-elev-2);
-    color: var(--text); border-radius: 40px; padding: 9px 18px; font-weight: 700;
+    color: var(--text); border-radius: 40px; padding: 9px 16px; font-weight: 700;
     font-family: 'Sora', sans-serif; font-size: 0.82rem; cursor: pointer; white-space: nowrap;
     transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    display: inline-flex; align-items: center; gap: 8px;
   }
+  .network-chip img { height: 20px; width: auto; max-width: 46px; object-fit: contain; filter: brightness(0) invert(1); opacity: 0.95; }
+  .network-chip.active img { filter: none; }
   .network-chip:hover { transform: translateY(-2px); }
   .network-chip.active { background: var(--gradient); border-color: transparent; color: #fff; }
   .network-heading { font-size: 0.8rem; color: var(--text-dim); margin: 2px 0 8px; }
 
-  /* ---------- Clear-list confirm ---------- */
+  /* Full-screen network browse page */
+  #network-page {
+    position: fixed; inset: 0; z-index: 2600; background: var(--bg);
+    display: none; flex-direction: column; overflow: hidden;
+  }
+  #network-page .np-top {
+    display: flex; align-items: center; gap: 12px; padding: 16px 20px;
+    border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 2;
+  }
+  #network-page .np-top h2 { font-family: 'Sora', sans-serif; margin: 0; font-size: 1.2rem; flex: 1; }
+  #network-page .np-strip { padding: 12px 20px; border-bottom: 1px solid var(--border); }
+  #network-page .np-scroll { flex: 1; overflow-y: auto; padding: 18px 20px 60px; }
+  .np-back {
+    background: var(--bg-elev-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 40px; padding: 8px 16px; font-weight: 700; cursor: pointer; font-family: 'Sora', sans-serif; font-size: 0.85rem;
+  }
+  .open-networks-btn {
+    width: 100%; background: var(--gradient); color: #fff; border: none; border-radius: 14px;
+    padding: 16px; font-weight: 800; font-family: 'Sora', sans-serif; font-size: 1rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+
   .clear-list-btn {
     background: none; border: 1px solid var(--border); color: var(--text-dim);
     border-radius: 8px; padding: 5px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
@@ -592,12 +616,26 @@
 <body>
 <!-- Cinematic splash + who's-watching -->
 <div id="splash">
+  <button id="splash-edit" style="display:none; position:absolute; top:18px; right:20px; background:var(--bg-elev-2); border:1px solid var(--border); color:var(--text); border-radius:40px; padding:8px 16px; font-weight:700; font-family:'Sora',sans-serif; font-size:0.8rem; cursor:pointer;">✏️ Edit profiles</button>
   <img src="show-shuffler-avatar.png" alt="Show Shuffler" class="splash-logo"
        onerror="this.style.display='none'">
   <div class="splash-wordmark">Show Shuffler</div>
   <div class="splash-tag">Can't pick? Let the dice decide 🎲</div>
   <div class="who-title" id="who-title" style="display:none;">Who's watching?</div>
   <div id="splash-profiles"></div>
+</div>
+
+<!-- Full-screen browse-by-network page -->
+<div id="network-page">
+  <div class="np-top">
+    <button class="np-back" id="network-back">← Back</button>
+    <h2>📡 Browse by network</h2>
+  </div>
+  <div class="np-strip"><div class="network-strip" id="network-strip"></div></div>
+  <div class="np-scroll">
+    <div class="network-heading" id="network-hint">Pick a network above to see its shows, then add the ones you want.</div>
+    <div class="search-results" id="network-results"></div>
+  </div>
 </div>
 
 <!-- Banned / maintenance gate -->
@@ -646,11 +684,8 @@
     </p>
   </header>
 
-  <div class="panel" id="network-panel" style="display:none;">
-    <h2>📡 Browse by network</h2>
-    <div class="network-heading">Tap a network to see its shows, then add the ones you want.</div>
-    <div class="network-strip" id="network-strip"></div>
-    <div class="search-results" id="network-results"></div>
+  <div class="panel" id="network-open-panel" style="display:none;">
+    <button class="open-networks-btn" id="open-networks">📡 Browse by network</button>
   </div>
 
   <div class="panel" id="search-panel" style="display:none;">
@@ -992,17 +1027,20 @@
   // Merge accidental duplicate profiles and strip email-as-name artifacts.
   function dedupeProfiles() {
     if (!Array.isArray(profiles) || !profiles.length) return;
-    // A profile whose name is literally an email is a login artifact — drop the
-    // name so it reads as "Guest" until the person sets a real one.
+    // A name that's literally an email, or an email's local part (dots, no
+    // spaces, all lowercase, no real capitals) is a login artifact — blank it
+    // so it shows as "Guest" until the person sets a real display name.
     profiles.forEach((p) => {
-      if (p.name && p.name.indexOf('@') !== -1) p.name = p.name.split('@')[0];
+      if (!p.name) return;
+      if (p.name.indexOf('@') !== -1) p.name = null;
+      else if (/^[a-z0-9._-]+$/.test(p.name) && p.name.indexOf('.') !== -1) p.name = null;
     });
-    // Collapse exact-duplicate profiles (same name + same show count), keeping
-    // the one with the most data.
+    // Collapse duplicate profiles (same name + same show/history counts),
+    // keeping the one with the most data.
     const seen = {};
     const kept = [];
     profiles.forEach((p) => {
-      const key = (p.name || '') + '|' + (p.list ? p.list.length : 0) + '|' + (p.history ? p.history.length : 0);
+      const key = (p.name || '~') + '|' + (p.list ? p.list.length : 0) + '|' + (p.history ? p.history.length : 0);
       if (seen[key] === undefined) { seen[key] = kept.length; kept.push(p); }
       else {
         const ex = kept[seen[key]];
@@ -1331,12 +1369,12 @@
 
   // ---------- Setup ----------
   function renderSetup() {
-    el('network-panel').style.display = 'block';
+    el('network-open-panel').style.display = 'block';
     el('search-panel').style.display = 'block';
     el('list-panel').style.display = 'block';
     el('shuffle-panel').style.display = 'block';
     el('history-panel').style.display = 'block';
-    renderNetworkStrip();
+    wireNetworkPage();
     wireClearList();
     el('region-select').value = region;
   }
@@ -1551,21 +1589,18 @@
   }
 
   // ---------- Browse by network ----------
-  // TMDB network IDs for the big ones (kid/animation-forward, plus majors).
+  // TMDB network IDs. Only well-verified US/English networks are listed so the
+  // results are real (a wrong ID pulls in unrelated foreign shows).
   const NETWORKS = [
     { id: 56, name: 'Cartoon Network' },
     { id: 13, name: 'Nickelodeon' },
     { id: 44, name: 'Disney Channel' },
     { id: 202, name: 'Disney XD' },
     { id: 80, name: 'Adult Swim' },
-    { id: 1265, name: 'Nick Jr.' },
-    { id: 4344, name: 'Boomerang' },
     { id: 2739, name: 'Disney+' },
     { id: 213, name: 'Netflix' },
     { id: 453, name: 'Hulu' },
-    { id: 14, name: 'PBS' },
     { id: 49, name: 'HBO' },
-    { id: 4330, name: 'Paramount+' },
     { id: 47, name: 'Comedy Central' },
     { id: 88, name: 'FX' },
     { id: 19, name: 'FOX' },
@@ -1573,26 +1608,60 @@
     { id: 16, name: 'CBS' },
     { id: 6, name: 'NBC' },
     { id: 174, name: 'AMC' },
+    { id: 14, name: 'PBS' },
+    { id: 4330, name: 'Paramount+' },
   ];
   let activeNetwork = null;
+  const networkLogos = {}; // id -> logo path (fetched from TMDB), or false if none
+
+  async function fetchNetworkLogo(id) {
+    if (networkLogos[id] !== undefined) return networkLogos[id];
+    try {
+      const data = await tmdbFetch('/network/' + id + '/images', {});
+      const logos = data.logos || [];
+      // prefer a light/PNG logo that shows on dark backgrounds
+      const pick = logos.find((l) => (l.file_path || '').toLowerCase().endsWith('.png')) || logos[0];
+      networkLogos[id] = pick ? pick.file_path : false;
+    } catch (e) { networkLogos[id] = false; }
+    return networkLogos[id];
+  }
+
   function renderNetworkStrip() {
     const strip = el('network-strip');
     if (!strip) return;
-    strip.innerHTML = NETWORKS.map((n) =>
-      '<button class="network-chip' + (activeNetwork === n.id ? ' active' : '') + '" data-net="' + n.id + '">' + escapeHtml(n.name) + '</button>'
-    ).join('');
+    strip.innerHTML = NETWORKS.map((n) => {
+      const logo = networkLogos[n.id];
+      const inner = logo ? '<img src="https://image.tmdb.org/t/p/h30' + logo + '" alt="' + escapeHtml(n.name) + '" onerror="this.remove()">' + '<span>' + escapeHtml(n.name) + '</span>' : escapeHtml(n.name);
+      return '<button class="network-chip' + (activeNetwork === n.id ? ' active' : '') + '" data-net="' + n.id + '">' + inner + '</button>';
+    }).join('');
     strip.querySelectorAll('[data-net]').forEach((b) => {
       b.addEventListener('click', () => browseNetwork(parseInt(b.getAttribute('data-net'), 10)));
     });
+    // lazy-load logos, then re-render once they arrive
+    NETWORKS.forEach((n) => {
+      if (networkLogos[n.id] === undefined) fetchNetworkLogo(n.id).then(() => renderNetworkStrip());
+    });
   }
+
   async function browseNetwork(netId) {
     activeNetwork = netId;
     renderNetworkStrip();
+    el('network-hint').style.display = 'none';
     const box = el('network-results');
     box.innerHTML = '<div class="empty">Loading…</div>';
     try {
-      const data = await tmdbFetch('/discover/tv', { with_networks: netId, sort_by: 'popularity.desc', page: 1 });
-      const shows = (data.results || []).filter((s) => s.poster_path).slice(0, 18);
+      // Pull several pages of English/US shows so it feels like the whole network.
+      const pages = await Promise.all([1, 2, 3].map((page) =>
+        tmdbFetch('/discover/tv', {
+          with_networks: netId, sort_by: 'popularity.desc',
+          with_original_language: 'en', page,
+        }).catch(() => ({ results: [] }))
+      ));
+      const seen = {};
+      const shows = [];
+      pages.forEach((d) => (d.results || []).forEach((s) => {
+        if (s.poster_path && !seen[s.id]) { seen[s.id] = 1; shows.push(s); }
+      }));
       if (!shows.length) { box.innerHTML = '<div class="empty">No shows found for this network.</div>'; return; }
       renderNetworkResults(shows);
     } catch (e) {
@@ -1624,6 +1693,21 @@
   }
 
   // ---------- Clear entire list (two-step confirm) ----------
+  let networkPageWired = false;
+  function wireNetworkPage() {
+    if (networkPageWired) return;
+    const openBtn = el('open-networks');
+    const backBtn = el('network-back');
+    if (!openBtn || !backBtn) return;
+    networkPageWired = true;
+    openBtn.addEventListener('click', () => {
+      el('network-page').style.display = 'flex';
+      renderNetworkStrip();
+      if (!activeNetwork) browseNetwork(NETWORKS[0].id); // land on Cartoon Network
+    });
+    backBtn.addEventListener('click', () => { el('network-page').style.display = 'none'; });
+  }
+
   let clearListWired = false;
   function wireClearList() {
     const btn = el('clear-list-btn');
@@ -3869,31 +3953,79 @@
     s.classList.add('splash-hide');
     setTimeout(() => { s.style.display = 'none'; }, 720);
   }
+
+  let splashEditMode = false;
+  // Decide whether to show the "Who's watching?" picker at all.
+  function splashShouldPick() {
+    // Returning/logged-in people, or anyone with more than one profile, pick.
+    if (fbEnabled && fbUser) return true;
+    if (profiles.length > 1) return true;
+    if (profiles.length === 1 && profiles[0].name) return true;
+    return false; // brand-new single guest -> skip straight through
+  }
+
+  function startSplash() {
+    // Always show the cinematic logo. After it plays, either show the picker
+    // (returning users) or slide straight into the app (brand-new users).
+    setTimeout(() => {
+      if (splashShouldPick()) {
+        buildSplashProfiles();
+      } else {
+        enterFromSplash();
+      }
+    }, 1600);
+  }
+
   function buildSplashProfiles() {
     const grid = el('splash-profiles');
     el('who-title').style.display = 'block';
+    const editBtn = el('splash-edit');
+    editBtn.style.display = profiles.length ? 'block' : 'none';
+    editBtn.textContent = splashEditMode ? '✓ Done' : '✏️ Edit profiles';
+    editBtn.onclick = () => { splashEditMode = !splashEditMode; buildSplashProfiles(); };
+
     let html = '';
     profiles.forEach((p, i) => {
       const nm = p.name ? escapeHtml(p.name) : 'Guest';
-      html += '<button class="profile-tile" data-sp="' + i + '"><span class="profile-avatar" style="background:' + avatarBgFor(p) + '">' + avatarInnerFor(p) + '</span><span class="profile-name">' + nm + '</span></button>';
+      html += '<div style="position:relative; display:inline-block;">' +
+        '<button class="profile-tile" data-sp="' + i + '">' +
+          '<span class="profile-avatar" style="background:' + avatarBgFor(p) + '">' + avatarInnerFor(p) + '</span>' +
+          '<span class="profile-name">' + nm + '</span></button>' +
+        (splashEditMode ? '<button data-spdel="' + i + '" style="position:absolute; top:-6px; right:-6px; width:30px; height:30px; border-radius:50%; background:var(--accent-2); color:#fff; border:none; font-size:1rem; cursor:pointer;">🗑</button>' : '') +
+        '</div>';
     });
-    html += '<button class="profile-tile add" data-sp-add="1"><span class="profile-avatar">＋</span><span class="profile-name">Add</span></button>';
+    if (!splashEditMode) {
+      html += '<button class="profile-tile add" data-sp-add="1"><span class="profile-avatar">＋</span><span class="profile-name">Add</span></button>';
+    }
     grid.innerHTML = html;
     grid.querySelectorAll('[data-sp]').forEach((b) => {
       b.addEventListener('click', () => {
+        if (splashEditMode) return; // in edit mode, tapping a tile does nothing
         const i = parseInt(b.getAttribute('data-sp'), 10);
         if (i !== activeProfile) switchProfile(i);
         enterFromSplash();
       });
     });
+    grid.querySelectorAll('[data-spdel]').forEach((b) => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const i = parseInt(b.getAttribute('data-spdel'), 10);
+        deleteProfile(i);
+        if (!profiles.length) { splashEditMode = false; }
+        buildSplashProfiles();
+      });
+    });
     const addBtn = grid.querySelector('[data-sp-add]');
-    if (addBtn) addBtn.addEventListener('click', () => { enterFromSplash(); setTimeout(showAddProfileForm, 400); });
+    if (addBtn) addBtn.addEventListener('click', () => {
+      // Open the setup form ON the splash (not hidden behind it).
+      el('account-bubble').style.display = 'block';
+      showAddProfileForm();
+    });
   }
 
   (async function init() {
     await loadPersisted();
-    // Splash: reveal "who's watching" after the logo animation
-    setTimeout(buildSplashProfiles, 1500);
+    startSplash();
     renderSetup();
     renderList();
     renderHistory();
