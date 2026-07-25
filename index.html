@@ -678,7 +678,7 @@
 </div>
 
 <!-- Admin -->
-<button id="admin-fab">🛠 Admin</button>
+<button id="admin-fab"><span class="ic" data-ic="tools"></span>Admin</button>
 <div id="admin-overlay"></div>
 <aside id="admin-panel" aria-label="Admin panel">
   <div class="admin-head">
@@ -699,7 +699,7 @@
 </aside>
 <div class="wrap">
   <header>
-    <h1>📺 Show Shuffler</h1>
+    <h1><span class="ic" data-ic="tv"></span>Show Shuffler</h1>
     <p>Add shows you can watch, hit shuffle, land on a random episode.</p>
     <p id="greeting" style="display:none; color: var(--teal); font-weight:600; font-size:0.85rem; margin-top:4px;"></p>
     <p id="account-tools" style="display:none;">
@@ -712,12 +712,12 @@
   </header>
 
   <nav class="top-nav" id="top-nav" style="display:none;">
-    <button class="nav-tab active" data-view="home">🏠 Home</button>
-    <button class="nav-tab" data-view="browse">📡 Browse</button>
+    <button class="nav-tab active" data-view="home"><span class="ic" data-ic="home"></span>Home</button>
+    <button class="nav-tab" data-view="browse"><span class="ic" data-ic="browse"></span>Browse</button>
   </nav>
 
   <div class="panel" id="cw-panel" style="display:none;">
-    <h2>🎬 Recently shuffled</h2>
+    <h2><span class="ic" data-ic="play"></span>Recently shuffled</h2>
     <div class="cw-hero" id="cw-hero"></div>
   </div>
 
@@ -728,7 +728,7 @@
   </div>
 
   <div class="panel" id="search-panel" style="display:none;">
-    <h2>🔍 Find shows</h2>
+    <h2><span class="ic" data-ic="search"></span>Find shows</h2>
     <div class="row">
       <input type="text" id="search-input" placeholder="Search for a show…" />
       <button class="btn btn-teal" id="search-btn" style="flex:0 0 auto;">Search</button>
@@ -738,15 +738,15 @@
   </div>
 
   <div class="panel" id="list-panel" style="display:none;">
-    <h2 style="display:flex; align-items:center; gap:8px;">📋 Your Shuffle List <span class="list-count-badge" id="list-count">0</span>
-      <button class="clear-list-btn" id="clear-list-btn">🗑 Clear list</button>
+    <h2 style="display:flex; align-items:center; gap:8px;"><span class="ic" data-ic="list"></span>Your Shuffle List <span class="list-count-badge" id="list-count">0</span>
+      <button class="clear-list-btn" id="clear-list-btn"><span class="ic" data-ic="trash"></span>Clear list</button>
     </h2>
     <div class="list-strip" id="list-items"></div>
     <div class="empty" id="list-empty">Nothing here yet — search above and add a few shows.</div>
   </div>
 
   <div class="panel" id="shuffle-panel" style="display:none;">
-    <h2>🎲 Shuffle</h2>
+    <h2><span class="ic" data-ic="dice"></span>Shuffle</h2>
     <div class="region-row">
       <span>Region:</span>
       <select id="region-select">
@@ -809,7 +809,7 @@
 
   <div class="panel" id="history-panel" style="display:none;">
     <div class="history-header-row">
-      <h2 style="margin:0;">🕘 Recently Watched</h2>
+      <h2 style="margin:0;"><span class="ic" data-ic="clock"></span>Recently Watched</h2>
       <button class="btn btn-ghost btn-small" id="clear-history-btn">Clear</button>
     </div>
     <div class="history-list" id="history-list"></div>
@@ -942,6 +942,26 @@
   let watchedSinceDismiss = [];       // distinct show ids watched since last dismissal
 
   const el = (id) => document.getElementById(id);
+
+  // Original inline line-icons (drawn here, no emoji). currentColor so they
+  // inherit text color. Kept tiny and consistent.
+  const _svg = (p, extra) => '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-0.12em;margin-right:0.35em;' + (extra || '') + '">' + p + '</svg>';
+  const ICON = {
+    home: _svg('<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>'),
+    browse: _svg('<circle cx="12" cy="12" r="3"/><path d="M3 12a9 9 0 0 1 9-9"/><path d="M3 12a9 9 0 0 0 9 9"/><path d="M12 3a9 9 0 0 1 9 9"/>'),
+    search: _svg('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>'),
+    list: _svg('<path d="M8 6h12"/><path d="M8 12h12"/><path d="M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>'),
+    dice: _svg('<rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="15" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/><circle cx="9" cy="15" r="1" fill="currentColor"/>'),
+    play: _svg('<path d="M6 4l14 8-14 8z" fill="currentColor" stroke="none"/>'),
+    clock: _svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+    pencil: _svg('<path d="M4 20h4L18 10l-4-4L4 16z"/><path d="M13 5l4 4"/>'),
+    check: _svg('<path d="M5 12l5 5L20 6"/>'),
+    trash: _svg('<path d="M4 7h16"/><path d="M9 7V5h6v2"/><path d="M6 7l1 13h10l1-13"/>'),
+    people: _svg('<circle cx="9" cy="8" r="3"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 5a3 3 0 0 1 0 6"/><path d="M18 20a6 6 0 0 0-3-5"/>'),
+    tv: _svg('<rect x="3" y="7" width="18" height="12" rx="2"/><path d="M8 3l4 4 4-4"/>'),
+    tools: _svg('<path d="M14 7a4 4 0 0 1-5 5l-6 6 2 2 6-6a4 4 0 0 0 5-5z"/>'),
+  };
+
 
   // ---------- Persistence ----------
   function normalizeProfile(p) {
@@ -1424,8 +1444,8 @@
   // ---------- Tabbed views ----------
   // Which panels belong to each tab.
   const VIEW_PANELS = {
-    home: ['cw-panel', 'shuffle-panel', 'history-panel'],
-    browse: ['network-inline-panel', 'search-panel', 'list-panel'],
+    home: ['shuffle-panel', 'list-panel', 'cw-panel', 'history-panel'],
+    browse: ['network-inline-panel', 'search-panel'],
   };
   let tabsWired = false;
   function wireTabs() {
@@ -1539,10 +1559,10 @@
 
     // Streaming services
     html += '<div class="settings-section"><h3>Streaming</h3>' +
-      '<button class="btn btn-ghost btn-small" id="set-services">📺 My services</button></div>';
+      '<button class="btn btn-ghost btn-small" id="set-services">' + ICON.tv + ' My services</button></div>';
 
     html += '<div class="settings-section"><h3>Profiles</h3>' +
-      '<button class="btn btn-ghost btn-small" id="set-profiles">👥 Back to profiles</button></div>';
+      '<button class="btn btn-ghost btn-small" id="set-profiles">' + ICON.people + ' Back to profiles</button></div>';
 
     // Blocked YouTube channels (this device) — let users see and undo their blocks.
     if (ytBlockedChannels.length) {
@@ -1574,6 +1594,11 @@
       const s = el('splash');
       s.classList.remove('splash-hide');
       s.style.display = 'flex';
+      s.style.opacity = '1';
+      s.style.visibility = 'visible';
+      s.style.transform = 'none';
+      // make sure the setup overlay isn't covering it
+      const su = el('splash-setup'); if (su) su.style.display = 'none';
       buildSplashProfiles();
     });
     el('settings-body').querySelectorAll('[data-unblock]').forEach(function (b) {
@@ -4062,7 +4087,12 @@
   function enterFromSplash() {
     const s = el('splash');
     s.classList.add('splash-hide');
-    setTimeout(() => { s.style.display = 'none'; }, 720);
+    setTimeout(() => {
+      s.style.display = 'none';
+      // clear the animation state so a later "Back to profiles" shows it cleanly
+      s.classList.remove('splash-hide');
+      s.style.opacity = ''; s.style.visibility = ''; s.style.transform = '';
+    }, 720);
   }
 
   let splashEditMode = false;
@@ -4089,10 +4119,18 @@
 
   function buildSplashProfiles() {
     const grid = el('splash-profiles');
+    // Force every splash element fully visible (animations may have left some
+    // faded out from the first run — this is why "Back to profiles" went blank).
+    const s = el('splash');
+    s.querySelectorAll('.splash-logo, .splash-wordmark, .splash-tag').forEach((n) => {
+      n.style.opacity = '1'; n.style.transform = 'none'; n.style.animation = 'none';
+    });
     el('who-title').style.display = 'block';
+    el('who-title').style.opacity = '1'; el('who-title').style.animation = 'none';
+    grid.style.opacity = '1'; grid.style.transform = 'none'; grid.style.animation = 'none';
     const editBtn = el('splash-edit');
     editBtn.style.display = profiles.length ? 'block' : 'none';
-    editBtn.textContent = splashEditMode ? '✓ Done' : '✏️ Edit profiles';
+    editBtn.innerHTML = splashEditMode ? ICON.check + ' Done' : ICON.pencil + ' Edit profiles';
     editBtn.onclick = () => { splashEditMode = !splashEditMode; buildSplashProfiles(); };
 
     let html = '';
@@ -4220,6 +4258,10 @@
 
   (async function init() {
     await loadPersisted();
+    // Paint drawn icons into any [data-ic] marker.
+    document.querySelectorAll('.ic[data-ic]').forEach((n) => {
+      const k = n.getAttribute('data-ic'); if (ICON[k]) n.innerHTML = ICON[k];
+    });
     startSplash();
     renderSetup();
     renderList();
