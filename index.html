@@ -661,20 +661,61 @@
   .home-net-strip::-webkit-scrollbar { display: none; }
 
   /* Recently shuffled hero (like Continue Watching) */
-  .cw-hero { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; }
+  .cw-hero { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 10px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .cw-hero::-webkit-scrollbar { display: none; }
   .cw-card {
-    position: relative; border-radius: 16px; overflow: hidden; cursor: pointer;
-    width: 320px; max-width: 100%; aspect-ratio: 16/10; background: var(--bg-elev-2);
-    box-shadow: 0 12px 34px rgba(0,0,0,0.4); border: 1px solid var(--border);
+    position: relative; border-radius: 14px; overflow: hidden; cursor: pointer;
+    flex: 0 0 auto; width: 210px; aspect-ratio: 16/10; background: var(--bg-elev-2);
+    box-shadow: var(--shadow-tight); border: 1px solid var(--glass-border);
   }
   .cw-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .cw-card .cw-meta {
-    position: absolute; left: 0; right: 0; bottom: 0; padding: 14px;
-    background: linear-gradient(transparent, rgba(0,0,0,0.85)); color: #fff;
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 11px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.88)); color: #fff;
   }
-  .cw-card .cw-ep { font-size: 0.78rem; opacity: 0.9; }
-  .cw-card .cw-title { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.05rem; }
+  .cw-card .cw-ep { font-size: 0.72rem; opacity: 0.9; }
+  .cw-card .cw-title { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 0.92rem; line-height: 1.15; }
   .cw-empty { color: var(--text-dim); padding: 20px 0; }
+
+  /* ---------- Glassy onboarding: add cartoons to your list ---------- */
+  #onboard {
+    position: fixed; inset: 0; z-index: 4700; display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    padding: 30px 18px;
+    background:
+      radial-gradient(circle at 20% 15%, rgba(178,150,255,0.5), transparent 45%),
+      radial-gradient(circle at 82% 20%, rgba(255,150,200,0.42), transparent 45%),
+      radial-gradient(circle at 50% 95%, rgba(150,220,255,0.4), transparent 55%),
+      linear-gradient(160deg, #efeaff, #ffeef6 55%, #eafaff);
+    animation: onbIn 0.6s ease;
+  }
+  @keyframes onbIn { from { opacity: 0; } to { opacity: 1; } }
+  #onboard .onb-head { text-align: center; margin-bottom: 22px; }
+  #onboard .onb-head h2 { font-family: 'Sora', sans-serif; font-weight: 800; font-size: clamp(1.5rem,5vw,2.1rem); color: #1a1330; margin: 0 0 6px; }
+  #onboard .onb-head p { color: #5b4d78; font-size: 0.95rem; margin: 0; font-weight: 500; }
+  #onboard .onb-count { color: #7c5cff; font-weight: 700; }
+  .onb-strip-wrap {
+    width: 100%; max-width: 760px;
+    background: rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.7);
+    border-radius: 24px; padding: 18px 14px;
+    box-shadow: 0 20px 60px rgba(120,90,180,0.25), inset 0 1px 0 rgba(255,255,255,0.9);
+    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  }
+  .onb-strip { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .onb-strip::-webkit-scrollbar { display: none; }
+  .onb-card { flex: 0 0 auto; width: 128px; cursor: pointer; text-align: center; }
+  .onb-poster { width: 128px; aspect-ratio: 2/3; border-radius: 14px; overflow: hidden; position: relative; box-shadow: 0 8px 22px rgba(80,60,120,0.28); border: 2px solid transparent; transition: transform .18s ease, border-color .18s ease; }
+  .onb-card:hover .onb-poster { transform: translateY(-4px); }
+  .onb-poster.added { border-color: #22c39c; }
+  .onb-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .onb-tag { position: absolute; left: 8px; right: 8px; bottom: 8px; border-radius: 9px; font-weight: 800; font-size: 0.78rem; padding: 6px 0; background: rgba(15,12,30,0.72); color: #fff; }
+  .onb-tag.added { background: rgba(34,195,156,0.95); color: #04231d; }
+  .onb-cname { font-size: 0.74rem; color: #3f3358; margin-top: 6px; font-weight: 600; line-height: 1.15; }
+  .onb-actions { position: fixed; left: 0; right: 0; bottom: 26px; display: flex; justify-content: space-between; padding: 0 24px; }
+  .onb-btn { border: none; border-radius: 40px; padding: 13px 26px; font-family: 'Sora', sans-serif; font-weight: 800; font-size: 0.95rem; cursor: pointer; box-shadow: 0 10px 26px rgba(80,60,120,0.28); }
+  .onb-back { background: rgba(255,255,255,0.8); color: #3f3358; }
+  .onb-continue { background: linear-gradient(135deg, #7c5cff, #ff5c9d); color: #fff; }
+  .onb-continue:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
 
   /* Profile setup card shown centered on the splash */
   #splash-setup {
@@ -760,6 +801,21 @@
 </div>
 
 <div id="splash-setup"><div class="ss-card" id="splash-setup-card"></div></div>
+
+<!-- Glassy onboarding: add cartoons to your list -->
+<div id="onboard">
+  <div class="onb-head">
+    <h2>Add to your list to get started</h2>
+    <p><span class="onb-count" id="onb-count">Add at least 2 shows</span> to start shuffling</p>
+  </div>
+  <div class="onb-strip-wrap">
+    <div class="onb-strip" id="onb-strip"></div>
+  </div>
+  <div class="onb-actions">
+    <button class="onb-btn onb-back" id="onb-back">← Back</button>
+    <button class="onb-btn onb-continue" id="onb-continue" disabled>Continue</button>
+  </div>
+</div>
 
 <!-- Glassy welcome / about modal for new & logged-out visitors -->
 <div id="welcome-modal">
@@ -1687,7 +1743,56 @@
     el('welcome-modal').style.display = 'none';
     try { localStorage.setItem('cartoon-shuffler-welcomed', '1'); } catch (e) {}
   }
-  el('wm-start').addEventListener('click', dismissWelcome);
+  el('wm-start').addEventListener('click', () => {
+    el('welcome-modal').style.display = 'none';
+    openOnboard();
+  });
+
+  // ---------- Glassy onboarding (add cartoons before entering) ----------
+  function openOnboard() {
+    el('onboard').style.display = 'flex';
+    renderOnboard();
+  }
+  function updateOnbCount() {
+    const n = list.length;
+    const countEl = el('onb-count');
+    const cont = el('onb-continue');
+    if (n >= 2) { countEl.textContent = n + ' added'; cont.disabled = false; }
+    else { countEl.textContent = 'Add at least ' + (2 - n) + ' more show' + ((2 - n) === 1 ? '' : 's'); cont.disabled = true; }
+  }
+  async function renderOnboard() {
+    const strip = el('onb-strip');
+    strip.innerHTML = '<div class="empty" style="color:#5b4d78;padding:24px;">Loading cartoons…</div>';
+    let shows;
+    try { shows = await getPopularCartoons(); }
+    catch (e) { strip.innerHTML = '<div class="empty" style="color:#5b4d78;">Couldn\'t load — check your connection.</div>'; return; }
+    strip.innerHTML = shows.map((s) => {
+      const added = list.some((x) => x.tmdbId === s.id);
+      return '<div class="onb-card"><div class="onb-poster' + (added ? ' added' : '') + '">' +
+        '<img src="' + IMG_BASE + s.poster_path + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' +
+        '<div class="onb-tag' + (added ? ' added' : '') + '" data-onbadd="' + s.id + '">' + (added ? 'Added ✓' : '+ Add') + '</div>' +
+        '</div><div class="onb-cname">' + escapeHtml(s.name) + '</div></div>';
+    }).join('');
+    strip.querySelectorAll('[data-onbadd]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const id = parseInt(b.getAttribute('data-onbadd'), 10);
+        if (list.some((x) => x.tmdbId === id)) return;
+        await addShow(id, shows);
+        renderOnboard();
+      });
+    });
+    updateOnbCount();
+  }
+  el('onb-back').addEventListener('click', () => {
+    el('onboard').style.display = 'none';
+    el('welcome-modal').style.display = 'flex';
+  });
+  el('onb-continue').addEventListener('click', () => {
+    if (list.length < 2) return;
+    el('onboard').style.display = 'none';
+    dismissWelcome();
+  });
+
   el('wm-signup').addEventListener('click', () => {
     dismissWelcome();
     el('account-bubble').style.display = 'block';
