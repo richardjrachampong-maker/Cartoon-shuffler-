@@ -1469,6 +1469,30 @@
   }
 
   // ---------- Recently shuffled hero ----------
+  // After logout: show the hero with sign-in options, no profiles until they return.
+  function showGuestHero() {
+    const s = el('splash');
+    s.classList.remove('splash-hide');
+    s.style.display = 'flex';
+    s.style.opacity = '1'; s.style.visibility = 'visible'; s.style.transform = 'none';
+    s.querySelectorAll('.splash-logo, .splash-wordmark, .splash-tag').forEach((n) => {
+      n.style.opacity = '1'; n.style.transform = 'none'; n.style.animation = 'none';
+    });
+    el('splash-edit').style.display = 'none';
+    el('who-title').style.display = 'none';
+    const grid = el('splash-profiles');
+    grid.style.opacity = '1'; grid.style.transform = 'none'; grid.style.animation = 'none';
+    grid.innerHTML =
+      '<div style="display:flex; flex-direction:column; gap:12px; width:min(320px,86vw); margin:0 auto;">' +
+        '<button class="btn btn-teal" id="hero-signup">Sign up</button>' +
+        '<button class="btn btn-ghost" id="hero-login">Log in</button>' +
+        '<button class="btn btn-ghost" id="hero-guest">Continue as guest</button>' +
+      '</div>';
+    el('hero-signup').onclick = () => { enterFromSplash(); el('account-bubble').style.display = 'block'; showAuthForm('signup'); };
+    el('hero-login').onclick = () => { enterFromSplash(); el('account-bubble').style.display = 'block'; showAuthForm('signin'); };
+    el('hero-guest').onclick = () => { enterFromSplash(); };
+  }
+
   function renderRecentlyShuffled() {
     const panel = el('cw-panel');
     const hero = el('cw-hero');
@@ -1484,10 +1508,23 @@
         '<div class="cw-meta"><div class="cw-title">' + escapeHtml(h.title || '') + '</div>' +
         '<div class="cw-ep">' + ep + '</div></div></div>';
     }).join('');
-    hero.querySelectorAll('[data-cw]').forEach((c) => {
-      c.addEventListener('click', () => {
+    hero.querySelectorAll('[data-cw]').forEach((c, idx) => {
+      c.addEventListener('click', async () => {
+        const h = items[idx];
         switchView('home');
-        doShuffle();
+        const show = list.find((s) => s.tmdbId === h.tmdbId);
+        if (!show || h.season == null) { doShuffle(); return; }
+        // Re-show the exact episode this card represents (continue-watching style).
+        el('np-content').innerHTML = '<div class="np-placeholder">tuning in…</div>';
+        try {
+          const eps = await getSeasonEpisodes(h.tmdbId, h.season);
+          const episode = (eps || []).find((e) => e.episode_number === h.episode) ||
+            { season_number: h.season, episode_number: h.episode, name: h.epTitle || '' };
+          const providers = await getWatchProviders(h.tmdbId, region);
+          hasStartedThisRound = false;
+          renderNowPlaying(show, episode, providers, false);
+          document.getElementById('shuffle-panel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } catch (e) { doShuffle(); }
       });
     });
   }
@@ -1583,7 +1620,11 @@
 
     const bind = (id, fn) => { const b = el(id); if (b) b.addEventListener('click', fn); };
     bind('set-changepw', sendPasswordChangeEmail);
-    bind('set-signout', async () => { try { await fbAuth.signOut(); } catch (e) {} location.reload(); });
+    bind('set-signout', async () => {
+      try { await fbAuth.signOut(); } catch (e) {}
+      closeSettings();
+      showGuestHero();
+    });
     bind('set-login', () => { closeSettings(); el('account-bubble').style.display = 'block'; showAuthForm('signin'); });
     bind('set-signup', () => { closeSettings(); el('account-bubble').style.display = 'block'; showAuthForm('signup'); });
     bind('set-theme', () => { toggleTheme(); renderSettings(); });
