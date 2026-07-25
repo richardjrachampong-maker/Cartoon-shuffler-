@@ -564,6 +564,29 @@
   }
   #gate-screen h2 { font-family: 'Sora', sans-serif; font-size: 1.6rem; margin: 0 0 12px; }
   #gate-screen p { color: var(--text-dim); max-width: 420px; line-height: 1.5; }
+  /* ---------- Network browse strip ---------- */
+  .network-strip {
+    display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 10px;
+    -webkit-overflow-scrolling: touch; scroll-behavior: smooth; scrollbar-width: none;
+  }
+  .network-strip::-webkit-scrollbar { display: none; }
+  .network-chip {
+    flex: 0 0 auto; border: 1px solid var(--border); background: var(--bg-elev-2);
+    color: var(--text); border-radius: 40px; padding: 9px 18px; font-weight: 700;
+    font-family: 'Sora', sans-serif; font-size: 0.82rem; cursor: pointer; white-space: nowrap;
+    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+  .network-chip:hover { transform: translateY(-2px); }
+  .network-chip.active { background: var(--gradient); border-color: transparent; color: #fff; }
+  .network-heading { font-size: 0.8rem; color: var(--text-dim); margin: 2px 0 8px; }
+
+  /* ---------- Clear-list confirm ---------- */
+  .clear-list-btn {
+    background: none; border: 1px solid var(--border); color: var(--text-dim);
+    border-radius: 8px; padding: 5px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
+    margin-left: auto;
+  }
+  .clear-list-btn:hover { border-color: var(--accent-2); color: var(--accent-2); }
 </style>
 </head>
 <body>
@@ -623,6 +646,13 @@
     </p>
   </header>
 
+  <div class="panel" id="network-panel" style="display:none;">
+    <h2>📡 Browse by network</h2>
+    <div class="network-heading">Tap a network to see its shows, then add the ones you want.</div>
+    <div class="network-strip" id="network-strip"></div>
+    <div class="search-results" id="network-results"></div>
+  </div>
+
   <div class="panel" id="search-panel" style="display:none;">
     <h2>🔍 Find shows</h2>
     <div class="row">
@@ -634,7 +664,9 @@
   </div>
 
   <div class="panel" id="list-panel" style="display:none;">
-    <h2>📋 Your Shuffle List <span class="list-count-badge" id="list-count">0</span></h2>
+    <h2 style="display:flex; align-items:center; gap:8px;">📋 Your Shuffle List <span class="list-count-badge" id="list-count">0</span>
+      <button class="clear-list-btn" id="clear-list-btn">🗑 Clear list</button>
+    </h2>
     <div class="list-strip" id="list-items"></div>
     <div class="empty" id="list-empty">Nothing here yet — search above and add a few shows.</div>
   </div>
@@ -844,15 +876,48 @@
       email: (p && p.email) || null,
       username: (p && p.username) || null,
       pwHash: (p && p.pwHash) || null,
+      avatar: (p && p.avatar) || null,  // index into AVATARS, or null for auto
       createdAt: (p && p.createdAt) || Date.now(),
       list: (p && Array.isArray(p.list)) ? p.list : [],
       history: (p && Array.isArray(p.history)) ? p.history.slice(0, 10) : [],
       recent: (p && Array.isArray(p.recent)) ? p.recent.slice(-500) : [],
-      // null = not configured yet; array = only these services get the portal
       services: (p && Array.isArray(p.services)) ? p.services : null,
-      // unfinished on-site episode to offer "continue watching"
       resume: (p && p.resume && typeof p.resume === 'object') ? p.resume : null,
     };
+  }
+
+  // Original, brand-styled avatars (never third-party characters). Each is an
+  // emoji face on a colored gradient tile — fun and copyright-clean.
+  const AVATARS = [
+    { emoji: '🦊', bg: 'linear-gradient(135deg,#FF8A3D,#FF3E7F)' },
+    { emoji: '🐸', bg: 'linear-gradient(135deg,#22D3B4,#3DDC84)' },
+    { emoji: '🐼', bg: 'linear-gradient(135deg,#7C5CFF,#4A4A6A)' },
+    { emoji: '🐙', bg: 'linear-gradient(135deg,#FF3E7F,#7C5CFF)' },
+    { emoji: '🦄', bg: 'linear-gradient(135deg,#B06CFF,#FF6CC0)' },
+    { emoji: '🐯', bg: 'linear-gradient(135deg,#FFB020,#FF6A3D)' },
+    { emoji: '🐧', bg: 'linear-gradient(135deg,#3DA5FF,#22D3B4)' },
+    { emoji: '👾', bg: 'linear-gradient(135deg,#7C5CFF,#22D3B4)' },
+    { emoji: '🐨', bg: 'linear-gradient(135deg,#8A94A6,#5A6478)' },
+    { emoji: '🦁', bg: 'linear-gradient(135deg,#FFB020,#FF3E7F)' },
+    { emoji: '🐵', bg: 'linear-gradient(135deg,#C08A5A,#8A5A3D)' },
+    { emoji: '🤖', bg: 'linear-gradient(135deg,#22D3B4,#3DA5FF)' },
+    { emoji: '👻', bg: 'linear-gradient(135deg,#B0B0D0,#7C5CFF)' },
+    { emoji: '🐰', bg: 'linear-gradient(135deg,#FF9EC4,#FF3E7F)' },
+    { emoji: '🎲', bg: 'linear-gradient(135deg,#7C5CFF,#FF3E7F)' },
+    { emoji: '🍿', bg: 'linear-gradient(135deg,#FFB020,#FFD84A)' },
+  ];
+  function avatarStyleFor(p) {
+    const a = (p && typeof p.avatar === 'number') ? AVATARS[p.avatar % AVATARS.length] : null;
+    return a || null;
+  }
+  function avatarInnerFor(p) {
+    const a = avatarStyleFor(p);
+    if (a) return a.emoji;
+    return (p && p.name ? p.name.trim()[0] : 'G').toUpperCase();
+  }
+  function avatarBgFor(p) {
+    const a = avatarStyleFor(p);
+    return a ? a.bg : 'linear-gradient(135deg,#7C5CFF,#FF3E7F)';
   }
 
   // Simple SHA-256 hash so the password isn't stored as plain text.
@@ -900,6 +965,10 @@
 
     let idx = 0;
     try { idx = parseInt(localStorage.getItem('show-shuffler-active') || '0', 10); } catch (e) { idx = 0; }
+    // Netflix model: a profile is "who's watching"; the account (email/login) is
+    // separate and owns the profiles. Clean up profiles that were mis-named after
+    // an email, and remove accidental duplicates.
+    dedupeProfiles();
     activeProfile = (idx >= 0 && idx < profiles.length) ? idx : 0;
     const p = profiles[activeProfile];
     account = p;
@@ -918,6 +987,31 @@
       const raw = localStorage.getItem('cartoon-shuffler-watched-since');
       watchedSinceDismiss = raw ? JSON.parse(raw) : [];
     } catch (e) { watchedSinceDismiss = []; }
+  }
+
+  // Merge accidental duplicate profiles and strip email-as-name artifacts.
+  function dedupeProfiles() {
+    if (!Array.isArray(profiles) || !profiles.length) return;
+    // A profile whose name is literally an email is a login artifact — drop the
+    // name so it reads as "Guest" until the person sets a real one.
+    profiles.forEach((p) => {
+      if (p.name && p.name.indexOf('@') !== -1) p.name = p.name.split('@')[0];
+    });
+    // Collapse exact-duplicate profiles (same name + same show count), keeping
+    // the one with the most data.
+    const seen = {};
+    const kept = [];
+    profiles.forEach((p) => {
+      const key = (p.name || '') + '|' + (p.list ? p.list.length : 0) + '|' + (p.history ? p.history.length : 0);
+      if (seen[key] === undefined) { seen[key] = kept.length; kept.push(p); }
+      else {
+        const ex = kept[seen[key]];
+        const richer = (p.list ? p.list.length : 0) + (p.history ? p.history.length : 0);
+        const exRich = (ex.list ? ex.list.length : 0) + (ex.history ? ex.history.length : 0);
+        if (richer > exRich) kept[seen[key]] = p;
+      }
+    });
+    if (kept.length && kept.length < profiles.length) profiles = kept;
   }
 
   // Write the working arrays back into the active profile, then persist all profiles.
@@ -1237,10 +1331,13 @@
 
   // ---------- Setup ----------
   function renderSetup() {
+    el('network-panel').style.display = 'block';
     el('search-panel').style.display = 'block';
     el('list-panel').style.display = 'block';
     el('shuffle-panel').style.display = 'block';
     el('history-panel').style.display = 'block';
+    renderNetworkStrip();
+    wireClearList();
     el('region-select').value = region;
   }
   el('region-select').addEventListener('change', (e) => {
@@ -1451,6 +1548,96 @@
     } catch (e) {
       el('search-error').textContent = e.message;
     }
+  }
+
+  // ---------- Browse by network ----------
+  // TMDB network IDs for the big ones (kid/animation-forward, plus majors).
+  const NETWORKS = [
+    { id: 56, name: 'Cartoon Network' },
+    { id: 13, name: 'Nickelodeon' },
+    { id: 44, name: 'Disney Channel' },
+    { id: 202, name: 'Disney XD' },
+    { id: 80, name: 'Adult Swim' },
+    { id: 1265, name: 'Nick Jr.' },
+    { id: 4344, name: 'Boomerang' },
+    { id: 2739, name: 'Disney+' },
+    { id: 213, name: 'Netflix' },
+    { id: 453, name: 'Hulu' },
+    { id: 14, name: 'PBS' },
+    { id: 49, name: 'HBO' },
+    { id: 4330, name: 'Paramount+' },
+    { id: 47, name: 'Comedy Central' },
+    { id: 88, name: 'FX' },
+    { id: 19, name: 'FOX' },
+    { id: 2, name: 'ABC' },
+    { id: 16, name: 'CBS' },
+    { id: 6, name: 'NBC' },
+    { id: 174, name: 'AMC' },
+  ];
+  let activeNetwork = null;
+  function renderNetworkStrip() {
+    const strip = el('network-strip');
+    if (!strip) return;
+    strip.innerHTML = NETWORKS.map((n) =>
+      '<button class="network-chip' + (activeNetwork === n.id ? ' active' : '') + '" data-net="' + n.id + '">' + escapeHtml(n.name) + '</button>'
+    ).join('');
+    strip.querySelectorAll('[data-net]').forEach((b) => {
+      b.addEventListener('click', () => browseNetwork(parseInt(b.getAttribute('data-net'), 10)));
+    });
+  }
+  async function browseNetwork(netId) {
+    activeNetwork = netId;
+    renderNetworkStrip();
+    const box = el('network-results');
+    box.innerHTML = '<div class="empty">Loading…</div>';
+    try {
+      const data = await tmdbFetch('/discover/tv', { with_networks: netId, sort_by: 'popularity.desc', page: 1 });
+      const shows = (data.results || []).filter((s) => s.poster_path).slice(0, 18);
+      if (!shows.length) { box.innerHTML = '<div class="empty">No shows found for this network.</div>'; return; }
+      renderNetworkResults(shows);
+    } catch (e) {
+      box.innerHTML = '<div class="empty">Couldn\'t load this network — try again.</div>';
+    }
+  }
+  function renderNetworkResults(results) {
+    const box = el('network-results');
+    box.innerHTML = '';
+    results.forEach((show) => {
+      const card = document.createElement('div');
+      card.className = 'show-card';
+      const poster = show.poster_path ? IMG_BASE + show.poster_path : '';
+      const already = list.some((s) => s.tmdbId === show.id);
+      card.innerHTML =
+        '<img src="' + poster + '" alt="" onerror="this.style.visibility=\'hidden\'" />' +
+        '<div class="overlay"><div class="title">' + escapeHtml(show.name) + '</div>' +
+          '<button class="btn btn-small ' + (already ? 'btn-ghost' : 'btn-teal') + '" data-netadd="' + show.id + '" ' + (already ? 'disabled' : '') + '>' +
+          (already ? 'Added ✓' : '+ Add') + '</button></div>';
+      box.appendChild(card);
+    });
+    box.querySelectorAll('[data-netadd]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        await addShow(parseInt(btn.getAttribute('data-netadd'), 10), results);
+        // refresh this network view so the button flips to "Added ✓"
+        renderNetworkResults(results);
+      });
+    });
+  }
+
+  // ---------- Clear entire list (two-step confirm) ----------
+  let clearListWired = false;
+  function wireClearList() {
+    const btn = el('clear-list-btn');
+    if (!btn || clearListWired) return;
+    clearListWired = true;
+    btn.addEventListener('click', () => {
+      if (!list.length) { alert('Your list is already empty.'); return; }
+      // Two separate confirms so an accidental tap can't wipe the list.
+      if (!confirm('Clear your ENTIRE shuffle list?\n\nAll ' + list.length + ' shows will be removed from this profile.')) return;
+      if (!confirm('Are you absolutely sure? This can\'t be undone.')) return;
+      list = [];
+      saveList();
+      renderList();
+    });
   }
 
   function renderSearchResults(results) {
@@ -2922,8 +3109,10 @@
       const label = p.name ? escapeHtml(p.name) : '(unnamed)';
       const mark = i === activeProfile ? ' ✓' : '';
       rows += '<div style="display:flex; gap:6px; margin-bottom:8px; align-items:stretch;">' +
-        '<button class="btn btn-small" data-profile="' + i + '" style="flex:1;">' +
-          '👤 ' + label + mark + ' <span style="opacity:0.7; font-weight:400;">· ' + (p.list ? p.list.length : 0) + ' shows</span></button>' +
+        '<button class="btn btn-small" data-profile="' + i + '" style="flex:1; display:flex; align-items:center; gap:8px; text-align:left;">' +
+          '<span style="width:30px; height:30px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; font-size:1.1rem; flex:0 0 auto; background:' + avatarBgFor(p) + ';">' + avatarInnerFor(p) + '</span>' +
+          '<span style="flex:1;">' + label + mark + ' <span style="opacity:0.7; font-weight:400;">· ' + (p.list ? p.list.length : 0) + ' shows</span></span></button>' +
+        '<button class="btn btn-ghost btn-small" data-editprofile="' + i + '" aria-label="Edit ' + label + '" style="flex:0 0 auto;">✏️</button>' +
         (profiles.length > 1 ? '<button class="btn btn-ghost btn-small" data-delprofile="' + i + '" aria-label="Delete ' + label + '" style="flex:0 0 auto;">🗑</button>' : '') +
         '</div>';
     });
@@ -2947,19 +3136,89 @@
         deleteProfile(parseInt(btn.getAttribute('data-delprofile'), 10));
       });
     });
+    el('bubble-inner').querySelectorAll('[data-editprofile]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showEditProfileForm(parseInt(btn.getAttribute('data-editprofile'), 10));
+      });
+    });
     el('add-profile-btn').addEventListener('click', showAddProfileForm);
   }
 
+  function showEditProfileForm(i) {
+    const p = profiles[i];
+    if (!p) return;
+    let pickedAvatar = (typeof p.avatar === 'number') ? p.avatar : 0;
+    const avGrid = AVATARS.map((a, idx) =>
+      '<button type="button" class="av-pick" data-av="' + idx + '" style="width:52px; height:52px; border-radius:12px; border:3px solid ' + (idx === pickedAvatar ? '#fff' : 'transparent') + '; background:' + a.bg + '; font-size:1.5rem; cursor:pointer; display:flex; align-items:center; justify-content:center;">' + a.emoji + '</button>'
+    ).join('');
+    el('bubble-inner').innerHTML =
+      '<div class="bubble-title">Edit profile</div>' +
+      '<div style="display:flex; justify-content:center; margin:6px 0 14px;">' +
+        '<span id="av-preview" style="width:84px; height:84px; border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:2.6rem; background:' + AVATARS[pickedAvatar].bg + '; box-shadow:0 10px 26px rgba(0,0,0,0.4);">' + AVATARS[pickedAvatar].emoji + '</span>' +
+      '</div>' +
+      '<div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:6px; text-align:center;">Pick an icon</div>' +
+      '<div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:14px;">' + avGrid + '</div>' +
+      '<input type="text" id="edit-profile-name" placeholder="Name" autocomplete="off" maxlength="20" value="' + escapeHtml(p.name || '') + '" />' +
+      '<div class="error-msg" id="edit-profile-error" style="display:none; margin-top:6px;">That name\'s already taken.</div>' +
+      '<div class="bubble-actions">' +
+        '<button class="btn btn-small" id="edit-profile-save">Save</button>' +
+        '<button class="btn btn-ghost btn-small" id="edit-profile-back">Back</button>' +
+      '</div>';
+    el('bubble-inner').querySelectorAll('.av-pick').forEach((b) => {
+      b.addEventListener('click', () => {
+        pickedAvatar = parseInt(b.getAttribute('data-av'), 10);
+        el('bubble-inner').querySelectorAll('.av-pick').forEach((x) => { x.style.borderColor = 'transparent'; });
+        b.style.borderColor = '#fff';
+        const prev = el('av-preview');
+        prev.textContent = AVATARS[pickedAvatar].emoji;
+        prev.style.background = AVATARS[pickedAvatar].bg;
+      });
+    });
+    el('edit-profile-back').addEventListener('click', showProfilesDialog);
+    el('edit-profile-save').addEventListener('click', () => {
+      const name = el('edit-profile-name').value.trim();
+      if (!name) { el('edit-profile-name').style.outline = '2px solid var(--accent-2)'; return; }
+      if (profiles.some((q, qi) => qi !== i && q.name && q.name.toLowerCase() === name.toLowerCase())) {
+        el('edit-profile-error').style.display = 'block'; return;
+      }
+      p.name = name; p.avatar = pickedAvatar;
+      if (i === activeProfile) { account.name = name; renderGreeting(); }
+      saveProfiles();
+      showProfilesDialog();
+    });
+  }
+
   function showAddProfileForm() {
+    let pickedAvatar = Math.floor(Math.random() * AVATARS.length);
+    const avGrid = AVATARS.map((a, i) =>
+      '<button type="button" class="av-pick" data-av="' + i + '" style="width:52px; height:52px; border-radius:12px; border:3px solid ' + (i === pickedAvatar ? '#fff' : 'transparent') + '; background:' + a.bg + '; font-size:1.5rem; cursor:pointer; display:flex; align-items:center; justify-content:center;">' + a.emoji + '</button>'
+    ).join('');
     el('bubble-inner').innerHTML =
       '<div class="bubble-title">Add a profile</div>' +
-      '<input type="text" id="new-profile-name" placeholder="Their name" autocomplete="off" />' +
+      '<div style="display:flex; justify-content:center; margin:6px 0 14px;">' +
+        '<span id="av-preview" style="width:84px; height:84px; border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:2.6rem; background:' + AVATARS[pickedAvatar].bg + '; box-shadow:0 10px 26px rgba(0,0,0,0.4);">' + AVATARS[pickedAvatar].emoji + '</span>' +
+      '</div>' +
+      '<div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:6px; text-align:center;">Pick an icon</div>' +
+      '<div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:14px;">' + avGrid + '</div>' +
+      '<input type="text" id="new-profile-name" placeholder="Their name" autocomplete="off" maxlength="20" />' +
       '<div class="error-msg" id="new-profile-error" style="display:none; margin-top:6px;">That name\'s already taken on this device.</div>' +
       '<div class="bubble-actions">' +
         '<button class="btn btn-small" id="new-profile-save">Create profile</button>' +
       '</div>' +
       '<div class="bubble-fineprint">They start with an empty show list — add their shows after switching.</div>';
     el('new-profile-name').focus();
+    // avatar selection
+    el('bubble-inner').querySelectorAll('.av-pick').forEach((b) => {
+      b.addEventListener('click', () => {
+        pickedAvatar = parseInt(b.getAttribute('data-av'), 10);
+        el('bubble-inner').querySelectorAll('.av-pick').forEach((x) => { x.style.borderColor = 'transparent'; });
+        b.style.borderColor = '#fff';
+        const prev = el('av-preview');
+        prev.textContent = AVATARS[pickedAvatar].emoji;
+        prev.style.background = AVATARS[pickedAvatar].bg;
+      });
+    });
     el('new-profile-save').addEventListener('click', () => {
       const name = el('new-profile-name').value.trim();
       if (!name) { el('new-profile-name').style.outline = '2px solid var(--accent-2)'; return; }
@@ -2967,7 +3226,7 @@
         el('new-profile-error').style.display = 'block';
         return;
       }
-      profiles.push(normalizeProfile({ name, createdAt: Date.now() }));
+      profiles.push(normalizeProfile({ name, avatar: pickedAvatar, createdAt: Date.now() }));
       switchProfile(profiles.length - 1);
       el('bubble-inner').innerHTML =
         '<div class="bubble-title">Hi, ' + escapeHtml(name) + '! 👋</div>' +
@@ -3131,7 +3390,9 @@
     let data = null;
     try { data = await fbLoadUserData(user.uid); } catch (e) {}
     if (data) {
-      account.name = data.name || (user.email ? user.email.split('@')[0] : 'You');
+      // Netflix model: the account is the LOGIN. Only fill a profile name from the
+      // cloud if this profile has no name yet — never overwrite with the email.
+      if (!account.name && data.name && data.name.indexOf('@') === -1) account.name = data.name;
       account.username = data.username || account.username || null;
       account.email = data.email || user.email || null;
       if (Array.isArray(data.list)) list = data.list;
@@ -3142,8 +3403,8 @@
       profiles[activeProfile].history = history;
       profiles[activeProfile].recent = recent;
     } else {
-      // First sign-in: seed the cloud from whatever is on this device.
-      account.name = user.email ? user.email.split('@')[0] : 'You';
+      // First sign-in: seed the cloud from whatever is on this device. Do NOT
+      // stamp the email onto the profile name.
       account.email = user.email || null;
       fbQueueSave();
     }
@@ -3614,8 +3875,7 @@
     let html = '';
     profiles.forEach((p, i) => {
       const nm = p.name ? escapeHtml(p.name) : 'Guest';
-      const initial = (p.name ? p.name.trim()[0] : 'G').toUpperCase();
-      html += '<button class="profile-tile" data-sp="' + i + '"><span class="profile-avatar">' + initial + '</span><span class="profile-name">' + nm + '</span></button>';
+      html += '<button class="profile-tile" data-sp="' + i + '"><span class="profile-avatar" style="background:' + avatarBgFor(p) + '">' + avatarInnerFor(p) + '</span><span class="profile-name">' + nm + '</span></button>';
     });
     html += '<button class="profile-tile add" data-sp-add="1"><span class="profile-avatar">＋</span><span class="profile-name">Add</span></button>';
     grid.innerHTML = html;
