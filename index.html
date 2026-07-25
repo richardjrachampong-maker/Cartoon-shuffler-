@@ -733,8 +733,10 @@
   #welcome-modal .wm-fine a { color: var(--teal); }
 
   /* Popular starter shows (shown when the list is empty) */
-  #popular-panel .pop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 12px; }
-  .pop-card { border-radius: 14px; overflow: hidden; background: var(--bg-elev-2); border: 1px solid var(--border); position: relative; }
+  /* Popular starter shows — horizontal scrolling strip, medium cards */
+  #popular-panel .pop-grid { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 10px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  #popular-panel .pop-grid::-webkit-scrollbar { display: none; }
+  .pop-card { flex: 0 0 auto; width: 118px; border-radius: 14px; overflow: hidden; background: var(--bg-elev-2); border: 1px solid var(--glass-border); position: relative; box-shadow: var(--shadow-tight); }
   .pop-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; }
   .pop-card .pop-add {
     position: absolute; left: 8px; right: 8px; bottom: 8px; border: none; border-radius: 10px;
