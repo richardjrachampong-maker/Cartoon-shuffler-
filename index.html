@@ -649,6 +649,43 @@
   #splash-setup .ss-preview { width: 92px; height: 92px; border-radius: 20px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 2.8rem; box-shadow: 0 10px 26px rgba(0,0,0,0.4); }
   #splash-setup .ss-actions { display: flex; gap: 10px; }
   #splash-setup .ss-actions button { flex: 1; }
+
+  /* ---------- Glassy welcome modal (new / logged-out visitors) ---------- */
+  #welcome-modal {
+    position: fixed; inset: 0; z-index: 4600; display: none;
+    align-items: center; justify-content: center; padding: 20px;
+    background: rgba(6,7,14,0.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  }
+  #welcome-modal .wm-card {
+    width: min(560px, 94vw); max-height: 88vh; overflow-y: auto; border-radius: 26px;
+    background: linear-gradient(160deg, rgba(36,38,66,0.86), rgba(16,17,32,0.9));
+    border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 30px 90px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.12);
+    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+    padding: 30px 26px; text-align: center;
+  }
+  #welcome-modal .wm-logo { width: 82px; height: 82px; border-radius: 22px; margin: 0 auto 16px; box-shadow: 0 12px 34px rgba(124,92,255,0.5); }
+  #welcome-modal h2 { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.7rem; margin: 0 0 8px; }
+  #welcome-modal .wm-sub { color: var(--text-dim); font-size: 1rem; margin: 0 0 20px; line-height: 1.5; }
+  #welcome-modal .wm-steps { display: flex; gap: 10px; margin-bottom: 22px; }
+  #welcome-modal .wm-step { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 14px 8px; }
+  #welcome-modal .wm-step .wm-ic { font-size: 1.5rem; margin-bottom: 6px; display: block; }
+  #welcome-modal .wm-step .wm-t { font-weight: 700; font-size: 0.82rem; }
+  #welcome-modal .wm-actions { display: flex; flex-direction: column; gap: 10px; }
+  #welcome-modal .wm-fine { font-size: 0.72rem; color: var(--text-dim); margin-top: 14px; line-height: 1.4; }
+  #welcome-modal .wm-fine a { color: var(--teal); }
+
+  /* Popular starter shows (shown when the list is empty) */
+  #popular-panel .pop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 12px; }
+  .pop-card { border-radius: 14px; overflow: hidden; background: var(--bg-elev-2); border: 1px solid var(--border); position: relative; }
+  .pop-card img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; }
+  .pop-card .pop-add {
+    position: absolute; left: 8px; right: 8px; bottom: 8px; border: none; border-radius: 10px;
+    background: rgba(10,11,20,0.82); color: #fff; font-weight: 700; font-size: 0.78rem; padding: 7px 0;
+    cursor: pointer; backdrop-filter: blur(6px);
+  }
+  .pop-card .pop-add.added { background: rgba(34,211,180,0.9); color: #04231d; }
+  .pop-name { font-size: 0.74rem; color: var(--text-dim); padding: 6px 8px 8px; text-align: center; }
 </style>
 </head>
 <body>
@@ -664,6 +701,25 @@
 </div>
 
 <div id="splash-setup"><div class="ss-card" id="splash-setup-card"></div></div>
+
+<!-- Glassy welcome / about modal for new & logged-out visitors -->
+<div id="welcome-modal">
+  <div class="wm-card">
+    <img src="logo-tv-192.png" alt="Show Shuffler" class="wm-logo" onerror="this.style.display='none'">
+    <h2>Welcome to Show Shuffler</h2>
+    <p class="wm-sub">Can't decide what to watch? Add the shows you love, hit shuffle, and land on a random episode — instantly.</p>
+    <div class="wm-steps">
+      <div class="wm-step"><span class="wm-ic" data-ic="list"></span><span class="wm-t">Add your shows</span></div>
+      <div class="wm-step"><span class="wm-ic" data-ic="dice"></span><span class="wm-t">Hit shuffle</span></div>
+      <div class="wm-step"><span class="wm-ic" data-ic="play"></span><span class="wm-t">Start watching</span></div>
+    </div>
+    <div class="wm-actions">
+      <button class="btn btn-teal" id="wm-start">Start shuffling</button>
+      <button class="btn btn-ghost" id="wm-signup">Create an account to save your list</button>
+    </div>
+    <div class="wm-fine">Free · no app needed. By continuing you agree to our <a href="terms.html" target="_blank">Terms</a> &amp; <a href="privacy.html" target="_blank">Privacy Policy</a>.</div>
+  </div>
+</div>
 
 <!-- Banned / maintenance gate -->
 <div id="gate-screen">
@@ -735,6 +791,12 @@
     </div>
     <div class="error-msg" id="search-error"></div>
     <div class="search-results" id="search-results"></div>
+  </div>
+
+  <div class="panel" id="popular-panel" style="display:none;">
+    <h2><span class="ic" data-ic="dice"></span>Popular right now</h2>
+    <div class="network-heading">New here? Add a few to start shuffling.</div>
+    <div class="pop-grid" id="pop-grid"></div>
   </div>
 
   <div class="panel" id="list-panel" style="display:none;">
@@ -1444,7 +1506,7 @@
   // ---------- Tabbed views ----------
   // Which panels belong to each tab.
   const VIEW_PANELS = {
-    home: ['shuffle-panel', 'list-panel', 'cw-panel', 'history-panel'],
+    home: ['shuffle-panel', 'popular-panel', 'list-panel', 'cw-panel', 'history-panel'],
     browse: ['network-inline-panel', 'search-panel'],
   };
   let tabsWired = false;
@@ -1463,9 +1525,40 @@
         const p = el(id); if (p) p.style.display = (v === view) ? 'block' : 'none';
       });
     });
-    if (view === 'home') renderRecentlyShuffled();
+    if (view === 'home') { renderRecentlyShuffled(); renderPopular(); }
     if (view === 'browse') { renderHomeNetworkStrip(); if (!activeNetwork && NETWORKS.length) browseNetwork(NETWORKS[0].id); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ---------- Popular starter shows (shown when the list is empty) ----------
+  let popularCache = null;
+  async function renderPopular() {
+    const panel = el('popular-panel');
+    if (!panel) return;
+    // Only useful when the person has few/no shows yet.
+    if (list.length > 4) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    const grid = el('pop-grid');
+    if (!popularCache) {
+      grid.innerHTML = '<div class="empty">Loading…</div>';
+      try {
+        const data = await tmdbFetch('/tv/popular', { page: 1 });
+        popularCache = (data.results || []).filter((s) => s.poster_path).slice(0, 12);
+      } catch (e) { grid.innerHTML = '<div class="empty">Couldn\'t load right now.</div>'; return; }
+    }
+    grid.innerHTML = popularCache.map((s) => {
+      const added = list.some((x) => x.tmdbId === s.id);
+      return '<div class="pop-card">' +
+        '<img src="' + IMG_BASE + s.poster_path + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' +
+        '<button class="pop-add' + (added ? ' added' : '') + '" data-pop="' + s.id + '"' + (added ? ' disabled' : '') + '>' + (added ? 'Added' : '+ Add') + '</button>' +
+        '<div class="pop-name">' + escapeHtml(s.name) + '</div></div>';
+    }).join('');
+    grid.querySelectorAll('[data-pop]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        await addShow(parseInt(b.getAttribute('data-pop'), 10), popularCache);
+        renderPopular();
+      });
+    });
   }
 
   // ---------- Recently shuffled hero ----------
@@ -1492,6 +1585,25 @@
     el('hero-login').onclick = () => { enterFromSplash(); el('account-bubble').style.display = 'block'; showAuthForm('signin'); };
     el('hero-guest').onclick = () => { enterFromSplash(); };
   }
+
+  // ---------- Welcome / about modal (new & logged-out visitors) ----------
+  function maybeShowWelcome() {
+    let seen = null;
+    try { seen = localStorage.getItem('cartoon-shuffler-welcomed'); } catch (e) {}
+    // Show for anyone not signed in who hasn't seen it. Signed-in users skip it.
+    if (seen || (fbEnabled && fbUser)) return;
+    el('welcome-modal').style.display = 'flex';
+  }
+  function dismissWelcome() {
+    el('welcome-modal').style.display = 'none';
+    try { localStorage.setItem('cartoon-shuffler-welcomed', '1'); } catch (e) {}
+  }
+  el('wm-start').addEventListener('click', dismissWelcome);
+  el('wm-signup').addEventListener('click', () => {
+    dismissWelcome();
+    el('account-bubble').style.display = 'block';
+    showAuthForm('signup');
+  });
 
   function renderRecentlyShuffled() {
     const panel = el('cw-panel');
@@ -1763,69 +1875,79 @@
   // ---------- Browse by network ----------
   // TMDB network IDs. Only well-verified US/English networks are listed so the
   // results are real (a wrong ID pulls in unrelated foreign shows).
+  // Each network can list several candidate TMDB IDs; the app verifies each
+  // against TMDB's real name and keeps the first that matches. This self-corrects
+  // wrong IDs (e.g. Disney XD vs. WGN America) without guessing blindly.
   const NETWORKS = [
-    { id: 56, name: 'Cartoon Network' },
-    { id: 13, name: 'Nickelodeon' },
-    { id: 44, name: 'Disney Channel' },
-    { id: 202, name: 'Disney XD' },
-    { id: 80, name: 'Adult Swim' },
-    { id: 2739, name: 'Disney+' },
-    { id: 213, name: 'Netflix' },
-    { id: 453, name: 'Hulu' },
-    { id: 49, name: 'HBO' },
-    { id: 47, name: 'Comedy Central' },
-    { id: 88, name: 'FX' },
-    { id: 19, name: 'FOX' },
-    { id: 2, name: 'ABC' },
-    { id: 16, name: 'CBS' },
-    { id: 6, name: 'NBC' },
-    { id: 174, name: 'AMC' },
-    { id: 14, name: 'PBS' },
-    { id: 4330, name: 'Paramount+' },
+    { name: 'Cartoon Network', ids: [56] },
+    { name: 'Nickelodeon', ids: [13] },
+    { name: 'Disney Channel', ids: [44, 54, 293, 549] },
+    { name: 'Disney XD', ids: [294, 295, 615, 1267] },
+    { name: 'Adult Swim', ids: [80] },
+    { name: 'Disney+', ids: [2739] },
+    { name: 'Netflix', ids: [213] },
+    { name: 'Hulu', ids: [453] },
+    { name: 'HBO', ids: [49] },
+    { name: 'Comedy Central', ids: [47] },
+    { name: 'FX', ids: [88] },
+    { name: 'FOX', ids: [19] },
+    { name: 'ABC', ids: [2] },
+    { name: 'CBS', ids: [16] },
+    { name: 'NBC', ids: [6] },
+    { name: 'AMC', ids: [174] },
+    { name: 'PBS', ids: [14] },
+    { name: 'Paramount+', ids: [4330] },
   ];
   let activeNetwork = null;
   const networkLogos = {}; // id -> logo path (fetched from TMDB), or false if none
-  const networkOk = {};    // id -> true if TMDB's real name matches our label
+  const networkOk = {};    // network name -> resolved id (or false if none matched)
 
   function normName(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
 
-  async function fetchNetworkMeta(n) {
-    if (networkOk[n.id] !== undefined) return;
-    // 1) Verify the ID really is the network we think it is (prevents e.g.
-    //    Disney XD's slot actually pulling WGN America).
-    try {
-      const meta = await tmdbFetch('/network/' + n.id, {});
-      const real = normName(meta && meta.name);
-      const want = normName(n.name);
-      networkOk[n.id] = !!(real && (real.indexOf(want) !== -1 || want.indexOf(real) !== -1));
-    } catch (e) { networkOk[n.id] = false; }
-    // 2) Grab a logo for the chip.
-    try {
-      const data = await tmdbFetch('/network/' + n.id + '/images', {});
-      const logos = data.logos || [];
-      const pick = logos.find((l) => (l.file_path || '').toLowerCase().endsWith('.png')) || logos[0];
-      networkLogos[n.id] = pick ? pick.file_path : false;
-    } catch (e) { networkLogos[n.id] = false; }
+  // Try each candidate id; keep the first whose TMDB name matches the label.
+  async function resolveNetwork(n) {
+    if (networkOk[n.name] !== undefined) return;
+    const want = normName(n.name);
+    for (const id of n.ids) {
+      try {
+        const meta = await tmdbFetch('/network/' + id, {});
+        const real = normName(meta && meta.name);
+        if (real && (real.indexOf(want) !== -1 || want.indexOf(real) !== -1)) {
+          networkOk[n.name] = id;
+          // grab a logo for the resolved id
+          try {
+            const imgs = await tmdbFetch('/network/' + id + '/images', {});
+            const logos = imgs.logos || [];
+            const pick = logos.find((l) => (l.file_path || '').toLowerCase().endsWith('.png')) || logos[0];
+            networkLogos[id] = pick ? pick.file_path : false;
+          } catch (e) { networkLogos[id] = false; }
+          return;
+        }
+      } catch (e) { /* try next candidate */ }
+    }
+    networkOk[n.name] = false; // none matched -> hidden
   }
 
   function renderNetworkStrip() {
     const strip = el('home-net-strip');
     if (!strip) return;
-    // Only show networks that verified (or haven't been checked yet).
-    const shown = NETWORKS.filter((n) => networkOk[n.id] !== false);
+    // Show networks that resolved to a real matching id (or are still checking).
+    const shown = NETWORKS.filter((n) => networkOk[n.name] !== false);
     strip.innerHTML = shown.map((n) => {
-      const logo = networkLogos[n.id];
+      const id = networkOk[n.name]; // resolved id or undefined while loading
+      const logo = id ? networkLogos[id] : null;
       const inner = logo
         ? '<img src="https://image.tmdb.org/t/p/h30' + logo + '" alt="' + escapeHtml(n.name) + '" title="' + escapeHtml(n.name) + '" onerror="this.parentNode.textContent=\'' + escapeHtml(n.name) + '\'">'
         : escapeHtml(n.name);
-      return '<button class="network-chip' + (activeNetwork === n.id ? ' active' : '') + '" data-net="' + n.id + '" title="' + escapeHtml(n.name) + '">' + inner + '</button>';
+      return '<button class="network-chip' + (activeNetwork === id ? ' active' : '') + '" data-net="' + (id || '') + '" title="' + escapeHtml(n.name) + '">' + inner + '</button>';
     }).join('');
     strip.querySelectorAll('[data-net]').forEach((b) => {
-      b.addEventListener('click', () => browseNetwork(parseInt(b.getAttribute('data-net'), 10)));
+      const id = parseInt(b.getAttribute('data-net'), 10);
+      if (id) b.addEventListener('click', () => browseNetwork(id));
     });
-    // lazily verify + load logos, then re-render as results arrive
+    // resolve any unchecked networks, then re-render as answers arrive
     NETWORKS.forEach((n) => {
-      if (networkOk[n.id] === undefined) fetchNetworkMeta(n).then(() => renderNetworkStrip());
+      if (networkOk[n.name] === undefined) resolveNetwork(n).then(() => renderNetworkStrip());
     });
   }
 
@@ -4130,9 +4252,9 @@
     s.classList.add('splash-hide');
     setTimeout(() => {
       s.style.display = 'none';
-      // clear the animation state so a later "Back to profiles" shows it cleanly
       s.classList.remove('splash-hide');
       s.style.opacity = ''; s.style.visibility = ''; s.style.transform = '';
+      maybeShowWelcome();
     }, 720);
   }
 
