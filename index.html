@@ -627,6 +627,28 @@
   .cw-card .cw-ep { font-size: 0.78rem; opacity: 0.9; }
   .cw-card .cw-title { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.05rem; }
   .cw-empty { color: var(--text-dim); padding: 20px 0; }
+
+  /* Profile setup card shown centered on the splash */
+  #splash-setup {
+    position: fixed; inset: 0; z-index: 4200; display: none;
+    align-items: flex-start; justify-content: center;
+    background: rgba(6,7,14,0.92); backdrop-filter: blur(6px);
+    padding: 40px 18px; overflow-y: auto;
+  }
+  #splash-setup .ss-card {
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: 20px;
+    padding: 22px; width: min(440px, 94vw); box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  #splash-setup h3 { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.3rem; margin: 0 0 16px; text-align: center; }
+  #splash-setup input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+    color: var(--text); padding: 13px 14px; font-family: inherit; font-size: 1rem; margin-bottom: 12px;
+  }
+  #splash-setup .ss-av-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+  #splash-setup .av-pick { width: 100%; aspect-ratio: 1; border-radius: 14px; font-size: 1.7rem; cursor: pointer; display: flex; align-items: center; justify-content: center; border: 3px solid transparent; }
+  #splash-setup .ss-preview { width: 92px; height: 92px; border-radius: 20px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 2.8rem; box-shadow: 0 10px 26px rgba(0,0,0,0.4); }
+  #splash-setup .ss-actions { display: flex; gap: 10px; }
+  #splash-setup .ss-actions button { flex: 1; }
 </style>
 </head>
 <body>
@@ -640,6 +662,8 @@
   <div class="who-title" id="who-title" style="display:none;">Who's watching?</div>
   <div id="splash-profiles"></div>
 </div>
+
+<div id="splash-setup"><div class="ss-card" id="splash-setup-card"></div></div>
 
 <!-- Banned / maintenance gate -->
 <div id="gate-screen">
@@ -1517,6 +1541,9 @@
     html += '<div class="settings-section"><h3>Streaming</h3>' +
       '<button class="btn btn-ghost btn-small" id="set-services">📺 My services</button></div>';
 
+    html += '<div class="settings-section"><h3>Profiles</h3>' +
+      '<button class="btn btn-ghost btn-small" id="set-profiles">👥 Back to profiles</button></div>';
+
     // Blocked YouTube channels (this device) — let users see and undo their blocks.
     if (ytBlockedChannels.length) {
       let brows = ytBlockedChannels.map(function (id) {
@@ -1541,6 +1568,14 @@
     bind('set-signup', () => { closeSettings(); el('account-bubble').style.display = 'block'; showAuthForm('signup'); });
     bind('set-theme', () => { toggleTheme(); renderSettings(); });
     bind('set-services', () => { closeSettings(); showServicesDialog(); });
+    bind('set-profiles', () => {
+      closeSettings();
+      splashEditMode = false;
+      const s = el('splash');
+      s.classList.remove('splash-hide');
+      s.style.display = 'flex';
+      buildSplashProfiles();
+    });
     el('settings-body').querySelectorAll('[data-unblock]').forEach(function (b) {
       b.addEventListener('click', function () {
         ytUnblockChannel(b.getAttribute('data-unblock'));
@@ -4067,7 +4102,7 @@
         '<button class="profile-tile" data-sp="' + i + '">' +
           '<span class="profile-avatar" style="background:' + avatarBgFor(p) + '">' + avatarInnerFor(p) + '</span>' +
           '<span class="profile-name">' + nm + '</span></button>' +
-        (splashEditMode ? '<button data-spdel="' + i + '" style="position:absolute; top:-6px; right:-6px; width:30px; height:30px; border-radius:50%; background:var(--accent-2); color:#fff; border:none; font-size:1rem; cursor:pointer;">🗑</button>' : '') +
+        (splashEditMode ? '<span style="position:absolute; top:-6px; right:-6px; width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:0.85rem; pointer-events:none;">✏️</span>' : '') +
         '</div>';
     });
     if (!splashEditMode) {
@@ -4076,26 +4111,110 @@
     grid.innerHTML = html;
     grid.querySelectorAll('[data-sp]').forEach((b) => {
       b.addEventListener('click', () => {
-        if (splashEditMode) return; // in edit mode, tapping a tile does nothing
         const i = parseInt(b.getAttribute('data-sp'), 10);
+        if (splashEditMode) { openProfileEditPage(i); return; } // edit mode -> edit page
         if (i !== activeProfile) switchProfile(i);
         enterFromSplash();
       });
     });
-    grid.querySelectorAll('[data-spdel]').forEach((b) => {
-      b.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const i = parseInt(b.getAttribute('data-spdel'), 10);
-        deleteProfile(i);
-        if (!profiles.length) { splashEditMode = false; }
-        buildSplashProfiles();
+    const addBtn = grid.querySelector('[data-sp-add]');
+    if (addBtn) addBtn.addEventListener('click', openSplashSetup);
+  }
+
+  // Full-page profile editor (name, icon, delete).
+  function openProfileEditPage(i) {
+    const p = profiles[i];
+    if (!p) return;
+    let pickedAvatar = (typeof p.avatar === 'number') ? p.avatar : 0;
+    const av = () => AVATARS[pickedAvatar];
+    const grid = AVATARS.map((a, idx) =>
+      '<button type="button" class="av-pick" data-av="' + idx + '" style="background:' + a.bg + '; border-color:' + (idx === pickedAvatar ? '#fff' : 'transparent') + ';">' + a.emoji + '</button>'
+    ).join('');
+    const canDelete = profiles.length > 1;
+    el('splash-setup-card').innerHTML =
+      '<h3>Edit profile</h3>' +
+      '<div class="ss-preview" id="ss-preview" style="background:' + av().bg + '">' + av().emoji + '</div>' +
+      '<div style="font-size:0.78rem; color:var(--text-dim); text-align:center; margin-bottom:8px;">Pick an icon</div>' +
+      '<div class="ss-av-grid">' + grid + '</div>' +
+      '<input type="text" id="ss-name" placeholder="Enter a name" autocomplete="off" maxlength="20" value="' + escapeHtml(p.name || '') + '" />' +
+      '<div class="error-msg" id="ss-error" style="display:none; margin-bottom:10px;">That name\'s already taken.</div>' +
+      '<div class="ss-actions">' +
+        '<button class="btn btn-teal btn-small" id="ss-save">Save</button>' +
+        '<button class="btn btn-ghost btn-small" id="ss-cancel">Cancel</button>' +
+      '</div>' +
+      (canDelete ? '<button class="btn btn-ghost btn-small" id="ss-delete" style="width:100%; margin-top:10px; color:var(--accent-2); border-color:var(--accent-2);">🗑 Delete this profile</button>' : '');
+    el('splash-setup').style.display = 'flex';
+    el('splash-setup-card').querySelectorAll('.av-pick').forEach((b) => {
+      b.addEventListener('click', () => {
+        pickedAvatar = parseInt(b.getAttribute('data-av'), 10);
+        el('splash-setup-card').querySelectorAll('.av-pick').forEach((x) => { x.style.borderColor = 'transparent'; });
+        b.style.borderColor = '#fff';
+        const pv = el('ss-preview'); pv.textContent = av().emoji; pv.style.background = av().bg;
       });
     });
-    const addBtn = grid.querySelector('[data-sp-add]');
-    if (addBtn) addBtn.addEventListener('click', () => {
-      // Open the setup form ON the splash (not hidden behind it).
-      el('account-bubble').style.display = 'block';
-      showAddProfileForm();
+    el('ss-cancel').addEventListener('click', () => { el('splash-setup').style.display = 'none'; buildSplashProfiles(); });
+    el('ss-save').addEventListener('click', () => {
+      const name = el('ss-name').value.trim();
+      if (!name) { el('ss-name').style.outline = '2px solid var(--accent-2)'; return; }
+      if (profiles.some((q, qi) => qi !== i && q.name && q.name.toLowerCase() === name.toLowerCase())) {
+        el('ss-error').style.display = 'block'; return;
+      }
+      p.name = name; p.avatar = pickedAvatar;
+      if (i === activeProfile) { account.name = name; renderGreeting(); }
+      saveProfiles();
+      el('splash-setup').style.display = 'none';
+      buildSplashProfiles();
+    });
+    if (canDelete) {
+      el('ss-delete').addEventListener('click', () => {
+        deleteProfile(i);
+        el('splash-setup').style.display = 'none';
+        if (!profiles.length) splashEditMode = false;
+        buildSplashProfiles();
+      });
+    }
+  }
+
+  // A visible, centered "create profile" card on the splash (the old bubble got
+  // hidden behind the keyboard).
+  function openSplashSetup() {
+    let pickedAvatar = Math.floor(Math.random() * AVATARS.length);
+    const av = () => AVATARS[pickedAvatar];
+    const grid = AVATARS.map((a, i) =>
+      '<button type="button" class="av-pick" data-av="' + i + '" style="background:' + a.bg + '; border-color:' + (i === pickedAvatar ? '#fff' : 'transparent') + ';">' + a.emoji + '</button>'
+    ).join('');
+    el('splash-setup-card').innerHTML =
+      '<h3>Create a profile</h3>' +
+      '<div class="ss-preview" id="ss-preview" style="background:' + av().bg + '">' + av().emoji + '</div>' +
+      '<div style="font-size:0.78rem; color:var(--text-dim); text-align:center; margin-bottom:8px;">Pick an icon</div>' +
+      '<div class="ss-av-grid">' + grid + '</div>' +
+      '<input type="text" id="ss-name" placeholder="Enter a name" autocomplete="off" maxlength="20" />' +
+      '<div class="error-msg" id="ss-error" style="display:none; margin-bottom:10px;">That name\'s already taken.</div>' +
+      '<div class="ss-actions">' +
+        '<button class="btn btn-teal btn-small" id="ss-create">Create profile</button>' +
+        '<button class="btn btn-ghost btn-small" id="ss-cancel">Cancel</button>' +
+      '</div>';
+    el('splash-setup').style.display = 'flex';
+    setTimeout(() => { const n = el('ss-name'); if (n) n.focus(); }, 100);
+    el('splash-setup-card').querySelectorAll('.av-pick').forEach((b) => {
+      b.addEventListener('click', () => {
+        pickedAvatar = parseInt(b.getAttribute('data-av'), 10);
+        el('splash-setup-card').querySelectorAll('.av-pick').forEach((x) => { x.style.borderColor = 'transparent'; });
+        b.style.borderColor = '#fff';
+        const pv = el('ss-preview'); pv.textContent = av().emoji; pv.style.background = av().bg;
+      });
+    });
+    el('ss-cancel').addEventListener('click', () => { el('splash-setup').style.display = 'none'; });
+    el('ss-create').addEventListener('click', () => {
+      const name = el('ss-name').value.trim();
+      if (!name) { el('ss-name').style.outline = '2px solid var(--accent-2)'; return; }
+      if (profiles.some((p) => p.name && p.name.toLowerCase() === name.toLowerCase())) {
+        el('ss-error').style.display = 'block'; return;
+      }
+      profiles.push(normalizeProfile({ name, avatar: pickedAvatar, createdAt: Date.now() }));
+      switchProfile(profiles.length - 1);
+      el('splash-setup').style.display = 'none';
+      enterFromSplash();
     });
   }
 
