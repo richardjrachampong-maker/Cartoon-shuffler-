@@ -720,6 +720,15 @@
   #welcome-modal .wm-step .wm-ic { font-size: 1.5rem; margin-bottom: 6px; display: block; }
   #welcome-modal .wm-step .wm-t { font-weight: 700; font-size: 0.82rem; }
   #welcome-modal .wm-actions { display: flex; flex-direction: column; gap: 10px; }
+  .wm-cartoons-head { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 0.9rem; text-align: left; margin: 4px 0 10px; }
+  .wm-cartoon-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 12px; margin-bottom: 18px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .wm-cartoon-strip::-webkit-scrollbar { display: none; }
+  .wm-cartoon { flex: 0 0 auto; width: 92px; text-align: center; cursor: pointer; }
+  .wm-cartoon .wm-poster { width: 92px; aspect-ratio: 2/3; border-radius: 12px; overflow: hidden; position: relative; border: 1px solid var(--glass-border); box-shadow: var(--shadow-tight); }
+  .wm-cartoon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .wm-cartoon .wm-addtag { position: absolute; left: 6px; right: 6px; bottom: 6px; border-radius: 8px; background: rgba(34,211,180,0.92); color: #04231d; font-weight: 800; font-size: 0.72rem; padding: 4px 0; }
+  .wm-cartoon .wm-addtag.added { background: rgba(255,255,255,0.85); color: #111; }
+  .wm-cartoon .wm-cname { font-size: 0.68rem; color: var(--text-dim); margin-top: 5px; line-height: 1.15; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   #welcome-modal .wm-fine { font-size: 0.72rem; color: var(--text-dim); margin-top: 14px; line-height: 1.4; }
   #welcome-modal .wm-fine a { color: var(--teal); }
 
@@ -753,6 +762,8 @@
 <!-- Glassy welcome / about modal for new & logged-out visitors -->
 <div id="welcome-modal">
   <div class="wm-card">
+    <div class="wm-cartoons-head">Get your list started 🎬</div>
+    <div class="wm-cartoon-strip" id="wm-cartoon-strip"></div>
     <img src="logo-tv-192.png" alt="Show Shuffler" class="wm-logo" onerror="this.style.display='none'">
     <h2>Welcome to Show Shuffler</h2>
     <p class="wm-sub">Can't decide what to watch? Add the shows you love, hit shuffle, and land on a random episode — instantly.</p>
@@ -825,6 +836,12 @@
     <div class="cw-hero" id="cw-hero"></div>
   </div>
 
+  <div class="panel" id="popular-panel" style="display:none;">
+    <h2><span class="ic" data-ic="dice"></span>Popular cartoons</h2>
+    <div class="network-heading">Trending animated shows — tap to add.</div>
+    <div class="pop-grid" id="pop-grid"></div>
+  </div>
+
   <div class="panel" id="network-inline-panel" style="display:none;">
     <div class="home-net-strip" id="home-net-strip"></div>
     <div class="network-heading" id="home-net-hint" style="margin-top:2px;">Tap a network above to see its shows.</div>
@@ -839,12 +856,6 @@
     </div>
     <div class="error-msg" id="search-error"></div>
     <div class="search-results" id="search-results"></div>
-  </div>
-
-  <div class="panel" id="popular-panel" style="display:none;">
-    <h2><span class="ic" data-ic="dice"></span>Popular right now</h2>
-    <div class="network-heading">New here? Add a few to start shuffling.</div>
-    <div class="pop-grid" id="pop-grid"></div>
   </div>
 
   <div class="panel" id="list-panel" style="display:none;">
@@ -1554,8 +1565,8 @@
   // ---------- Tabbed views ----------
   // Which panels belong to each tab.
   const VIEW_PANELS = {
-    home: ['shuffle-panel', 'popular-panel', 'list-panel', 'cw-panel', 'history-panel'],
-    browse: ['network-inline-panel', 'search-panel'],
+    home: ['shuffle-panel', 'list-panel', 'cw-panel', 'history-panel'],
+    browse: ['popular-panel', 'network-inline-panel', 'search-panel'],
   };
   let tabsWired = false;
   function wireTabs() {
@@ -1573,28 +1584,32 @@
         const p = el(id); if (p) p.style.display = (v === view) ? 'block' : 'none';
       });
     });
-    if (view === 'home') { renderRecentlyShuffled(); renderPopular(); }
-    if (view === 'browse') { renderHomeNetworkStrip(); if (!activeNetwork && NETWORKS.length) browseNetwork(NETWORKS[0].id); }
+    if (view === 'home') renderRecentlyShuffled();
+    if (view === 'browse') { renderPopularCartoons(); renderHomeNetworkStrip(); if (!activeNetwork && NETWORKS.length) browseNetwork(NETWORKS[0].id); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  // ---------- Popular starter shows (shown when the list is empty) ----------
-  let popularCache = null;
-  async function renderPopular() {
-    const panel = el('popular-panel');
-    if (!panel) return;
-    // Only useful when the person has few/no shows yet.
-    if (list.length > 4) { panel.style.display = 'none'; return; }
-    panel.style.display = 'block';
+  // ---------- Popular CARTOONS (Animation genre, English), by popularity ----------
+  let cartoonCache = null;
+  async function getPopularCartoons() {
+    if (cartoonCache) return cartoonCache;
+    const data = await tmdbFetch('/discover/tv', {
+      with_genres: 16, with_original_language: 'en',
+      sort_by: 'popularity.desc', page: 1,
+    });
+    cartoonCache = (data.results || []).filter((s) => s.poster_path).slice(0, 15);
+    return cartoonCache;
+  }
+
+  // Popular-cartoons panel on the Browse tab
+  async function renderPopularCartoons() {
     const grid = el('pop-grid');
-    if (!popularCache) {
-      grid.innerHTML = '<div class="empty">Loading…</div>';
-      try {
-        const data = await tmdbFetch('/tv/popular', { page: 1 });
-        popularCache = (data.results || []).filter((s) => s.poster_path).slice(0, 12);
-      } catch (e) { grid.innerHTML = '<div class="empty">Couldn\'t load right now.</div>'; return; }
-    }
-    grid.innerHTML = popularCache.map((s) => {
+    if (!grid) return;
+    grid.innerHTML = '<div class="empty">Loading…</div>';
+    let shows;
+    try { shows = await getPopularCartoons(); }
+    catch (e) { grid.innerHTML = '<div class="empty">Couldn\'t load right now.</div>'; return; }
+    grid.innerHTML = shows.map((s) => {
       const added = list.some((x) => x.tmdbId === s.id);
       return '<div class="pop-card">' +
         '<img src="' + IMG_BASE + s.poster_path + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' +
@@ -1603,8 +1618,31 @@
     }).join('');
     grid.querySelectorAll('[data-pop]').forEach((b) => {
       b.addEventListener('click', async () => {
-        await addShow(parseInt(b.getAttribute('data-pop'), 10), popularCache);
-        renderPopular();
+        await addShow(parseInt(b.getAttribute('data-pop'), 10), shows);
+        renderPopularCartoons();
+      });
+    });
+  }
+
+  // Cartoon starter strip inside the welcome modal
+  async function renderWelcomeCartoons() {
+    const strip = el('wm-cartoon-strip');
+    if (!strip) return;
+    strip.innerHTML = '<div class="empty" style="padding:12px;">Loading…</div>';
+    let shows;
+    try { shows = await getPopularCartoons(); }
+    catch (e) { strip.innerHTML = ''; return; }
+    strip.innerHTML = shows.slice(0, 12).map((s) => {
+      const added = list.some((x) => x.tmdbId === s.id);
+      return '<div class="wm-cartoon"><div class="wm-poster">' +
+        '<img src="' + IMG_BASE + s.poster_path + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' +
+        '<div class="wm-addtag' + (added ? ' added' : '') + '" data-wmadd="' + s.id + '">' + (added ? 'Added' : '+ Add') + '</div>' +
+        '</div><div class="wm-cname">' + escapeHtml(s.name) + '</div></div>';
+    }).join('');
+    strip.querySelectorAll('[data-wmadd]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        await addShow(parseInt(b.getAttribute('data-wmadd'), 10), shows);
+        renderWelcomeCartoons();
       });
     });
   }
@@ -1641,6 +1679,7 @@
     // Show for anyone not signed in who hasn't seen it. Signed-in users skip it.
     if (seen || (fbEnabled && fbUser)) return;
     el('welcome-modal').style.display = 'flex';
+    renderWelcomeCartoons();
   }
   function dismissWelcome() {
     el('welcome-modal').style.display = 'none';
