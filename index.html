@@ -700,6 +700,18 @@
   .cf-card.cf-center .cf-cname { opacity: 1; }
   @media (prefers-reduced-motion: reduce) { .cf-card { transition: none; } }
 
+  /* ---------- Arc/semicircle mode: left cards rise, right cards descend ---------- */
+  .arcflow {
+    scroll-snap-type: x mandatory; perspective: 1200px; padding-left: 42%; padding-right: 42%;
+    padding-top: 30px; padding-bottom: 10px;
+  }
+  .arcflow > * {
+    scroll-snap-align: center;
+    transition: transform .3s cubic-bezier(.2,.7,.3,1), opacity .3s ease;
+    will-change: transform;
+  }
+  @media (prefers-reduced-motion: reduce) { .arcflow > * { transition: none; } }
+
   /* ---------- Glassy onboarding: add cartoons to your list ---------- */
   #onboard {
     position: fixed; inset: 0; z-index: 4700; display: none;
@@ -1668,6 +1680,37 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  // Arc/semicircle effect on an existing horizontal strip (doesn't rebuild cards).
+  // Left cards rise + tilt up, right cards drop + tilt down, following a sine arc.
+  function applyArc(container) {
+    if (!container) return;
+    container.classList.add('arcflow');
+    const cards = Array.from(container.children);
+    if (!cards.length) return;
+    const paint = () => {
+      const rect = container.getBoundingClientRect();
+      const mid = rect.left + rect.width / 2;
+      cards.forEach((c) => {
+        const cr = c.getBoundingClientRect();
+        const cc = cr.left + cr.width / 2;
+        const d = Math.max(-2, Math.min(2, (cc - mid) / (rect.width / 3.2)));
+        const y = Math.sin(d * 0.75) * 90;   // right(+)=down, left(-)=up -> semicircle
+        const rot = d * 11;                    // tilt tangent to the arc
+        const scale = Math.max(0.72, 1 - Math.abs(d) * 0.16);
+        c.style.transform = 'translateY(' + y + 'px) rotate(' + rot + 'deg) scale(' + scale + ')';
+        c.style.opacity = String(Math.max(0.5, 1 - Math.abs(d) * 0.32));
+        c.style.zIndex = String(100 - Math.round(Math.abs(d) * 40));
+      });
+    };
+    let raf = null;
+    container.addEventListener('scroll', () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => { paint(); raf = null; });
+    });
+    requestAnimationFrame(paint);
+    setTimeout(paint, 120);
+  }
+
   // ---------- Coverflow carousel builder (shared by onboard + popular) ----------
   // items: [{id, poster, name}]; isAdded(id) -> bool; onAdd(id) called on tap.
   function buildCoverflow(container, items, isAdded, onAdd) {
@@ -1882,6 +1925,7 @@
         } catch (e) { doShuffle(); }
       });
     });
+    applyArc(hero);
   }
   el('region-select').addEventListener('change', (e) => {
     region = e.target.value;
