@@ -1711,6 +1711,31 @@
     });
     requestAnimationFrame(paint);
     setTimeout(paint, 120);
+
+    // Auto-advance every 4s; pauses while the user interacts, loops at the end.
+    if (container.__arcTimer) clearInterval(container.__arcTimer);
+    let paused = false, pauseT = null;
+    const pause = () => {
+      paused = true;
+      if (pauseT) clearTimeout(pauseT);
+      pauseT = setTimeout(() => { paused = false; }, 6000);
+    };
+    ['touchstart', 'pointerdown', 'wheel'].forEach((ev) =>
+      container.addEventListener(ev, pause, { passive: true }));
+    container.__arcTimer = setInterval(() => {
+      if (paused || !container.offsetParent) return;
+      const cs = Array.from(container.children);
+      if (cs.length < 2) return;
+      const rect = container.getBoundingClientRect();
+      const mid = rect.left + rect.width / 2;
+      let idx = 0, best = Infinity;
+      cs.forEach((c, i) => {
+        const cr = c.getBoundingClientRect();
+        const dist = Math.abs((cr.left + cr.width / 2) - mid);
+        if (dist < best) { best = dist; idx = i; }
+      });
+      cs[(idx + 1) % cs.length].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }, 4000);
   }
 
   // ---------- Coverflow carousel builder (shared by onboard + popular) ----------
