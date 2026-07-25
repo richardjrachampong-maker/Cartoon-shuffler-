@@ -148,7 +148,7 @@
   header h1 {
     font-family: 'Sora', sans-serif;
     font-weight: 800;
-    font-size: clamp(2rem, 6vw, 2.9rem);
+    font-size: clamp(1.5rem, 4vw, 2.1rem);
     margin: 0;
     letter-spacing: -0.02em;
     background: var(--gradient);
@@ -156,21 +156,21 @@
     background-clip: text;
     color: transparent;
   }
-  header p { font-size: 0.92rem; margin-top: 10px; color: var(--text-dim); }
+  header p { font-size: 0.82rem; margin-top: 6px; color: var(--text-dim); }
 
   .panel {
     background: var(--bg-elev);
     border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 22px;
-    margin-bottom: 22px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
   }
   .panel h2 {
     font-family: 'Sora', sans-serif;
     font-weight: 700;
-    font-size: 1.05rem;
-    margin: 0 0 14px;
+    font-size: 0.95rem;
+    margin: 0 0 10px;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -572,44 +572,61 @@
   .network-strip::-webkit-scrollbar { display: none; }
   .network-chip {
     flex: 0 0 auto; border: 1px solid var(--border); background: #fff;
-    color: #111; border-radius: 40px; padding: 10px 18px; font-weight: 700;
-    font-family: 'Sora', sans-serif; font-size: 0.82rem; cursor: pointer; white-space: nowrap;
+    color: #111; border-radius: 40px; padding: 7px 14px; font-weight: 700;
+    font-family: 'Sora', sans-serif; font-size: 0.78rem; cursor: pointer; white-space: nowrap;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
-    display: inline-flex; align-items: center; justify-content: center; min-height: 44px;
+    display: inline-flex; align-items: center; justify-content: center; min-height: 34px;
   }
-  .network-chip img { height: 24px; width: auto; max-width: 100px; object-fit: contain; display: block; }
+  .network-chip img { height: 18px; width: auto; max-width: 78px; object-fit: contain; display: block; }
   .network-chip:hover { transform: translateY(-2px); }
   .network-chip.active { box-shadow: 0 0 0 3px var(--accent), 0 6px 18px rgba(124,92,255,0.45); }
   .network-heading { font-size: 0.8rem; color: var(--text-dim); margin: 2px 0 8px; }
 
   /* Full-screen network browse page */
-  #network-page {
-    position: fixed; inset: 0; z-index: 2600; background: var(--bg);
-    display: none; flex-direction: column; overflow: hidden;
-  }
-  #network-page .np-top {
-    display: flex; align-items: center; gap: 12px; padding: 16px 20px;
-    border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 2;
-  }
-  #network-page .np-top h2 { font-family: 'Sora', sans-serif; margin: 0; font-size: 1.2rem; flex: 1; }
-  #network-page .np-strip { padding: 12px 20px; border-bottom: 1px solid var(--border); }
-  #network-page .np-scroll { flex: 1; overflow-y: auto; padding: 18px 20px 60px; }
-  .np-back {
-    background: var(--bg-elev-2); border: 1px solid var(--border); color: var(--text);
-    border-radius: 40px; padding: 8px 16px; font-weight: 700; cursor: pointer; font-family: 'Sora', sans-serif; font-size: 0.85rem;
-  }
-  .open-networks-btn {
-    width: 100%; background: var(--gradient); color: #fff; border: none; border-radius: 14px;
-    padding: 16px; font-weight: 800; font-family: 'Sora', sans-serif; font-size: 1rem; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-  }
-
+  
   .clear-list-btn {
     background: none; border: 1px solid var(--border); color: var(--text-dim);
     border-radius: 8px; padding: 5px 12px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
     margin-left: auto;
   }
   .clear-list-btn:hover { border-color: var(--accent-2); color: var(--accent-2); }
+  /* ---------- Top nav (clean tabbed layout) ---------- */
+  .top-nav {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 6px; margin: 0 auto 12px; max-width: 420px;
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: 50px;
+    position: sticky; top: 8px; z-index: 40; backdrop-filter: blur(8px);
+  }
+  .nav-tab {
+    flex: 1; border: none; background: none; color: var(--text-dim);
+    font-family: 'Sora', sans-serif; font-weight: 700; font-size: 0.82rem;
+    padding: 8px 12px; border-radius: 40px; cursor: pointer; white-space: nowrap;
+    display: flex; align-items: center; justify-content: center; gap: 5px; transition: all 0.15s ease;
+  }
+  .nav-tab.active { background: var(--gradient); color: #fff; }
+  .app-view { display: none; }
+  .app-view.active { display: block; animation: viewIn 0.25s ease; }
+  @keyframes viewIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* Inline logo network strip (no big button) */
+  .home-net-strip { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 12px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .home-net-strip::-webkit-scrollbar { display: none; }
+
+  /* Recently shuffled hero (like Continue Watching) */
+  .cw-hero { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; }
+  .cw-card {
+    position: relative; border-radius: 16px; overflow: hidden; cursor: pointer;
+    width: 320px; max-width: 100%; aspect-ratio: 16/10; background: var(--bg-elev-2);
+    box-shadow: 0 12px 34px rgba(0,0,0,0.4); border: 1px solid var(--border);
+  }
+  .cw-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cw-card .cw-meta {
+    position: absolute; left: 0; right: 0; bottom: 0; padding: 14px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85)); color: #fff;
+  }
+  .cw-card .cw-ep { font-size: 0.78rem; opacity: 0.9; }
+  .cw-card .cw-title { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.05rem; }
+  .cw-empty { color: var(--text-dim); padding: 20px 0; }
 </style>
 </head>
 <body>
@@ -622,19 +639,6 @@
   <div class="splash-tag">Can't pick? Let the dice decide 🎲</div>
   <div class="who-title" id="who-title" style="display:none;">Who's watching?</div>
   <div id="splash-profiles"></div>
-</div>
-
-<!-- Full-screen browse-by-network page -->
-<div id="network-page">
-  <div class="np-top">
-    <button class="np-back" id="network-back">← Back</button>
-    <h2>📡 Browse by network</h2>
-  </div>
-  <div class="np-strip"><div class="network-strip" id="network-strip"></div></div>
-  <div class="np-scroll">
-    <div class="network-heading" id="network-hint">Pick a network above to see its shows, then add the ones you want.</div>
-    <div class="search-results" id="network-results"></div>
-  </div>
 </div>
 
 <!-- Banned / maintenance gate -->
@@ -683,8 +687,20 @@
     </p>
   </header>
 
-  <div class="panel" id="network-open-panel" style="display:none;">
-    <button class="open-networks-btn" id="open-networks">📡 Browse by network</button>
+  <nav class="top-nav" id="top-nav" style="display:none;">
+    <button class="nav-tab active" data-view="home">🏠 Home</button>
+    <button class="nav-tab" data-view="browse">📡 Browse</button>
+  </nav>
+
+  <div class="panel" id="cw-panel" style="display:none;">
+    <h2>🎬 Recently shuffled</h2>
+    <div class="cw-hero" id="cw-hero"></div>
+  </div>
+
+  <div class="panel" id="network-inline-panel" style="display:none;">
+    <div class="home-net-strip" id="home-net-strip"></div>
+    <div class="network-heading" id="home-net-hint" style="margin-top:2px;">Tap a network above to see its shows.</div>
+    <div class="search-results" id="home-net-results"></div>
   </div>
 
   <div class="panel" id="search-panel" style="display:none;">
@@ -1368,14 +1384,68 @@
 
   // ---------- Setup ----------
   function renderSetup() {
-    el('network-open-panel').style.display = 'block';
+    el('top-nav').style.display = 'flex';
+    el('network-inline-panel').style.display = 'block';
     el('search-panel').style.display = 'block';
     el('list-panel').style.display = 'block';
     el('shuffle-panel').style.display = 'block';
     el('history-panel').style.display = 'block';
-    wireNetworkPage();
+    wireTabs();
+    renderHomeNetworkStrip();
     wireClearList();
     el('region-select').value = region;
+    switchView('home');
+  }
+
+  // ---------- Tabbed views ----------
+  // Which panels belong to each tab.
+  const VIEW_PANELS = {
+    home: ['cw-panel', 'shuffle-panel', 'history-panel'],
+    browse: ['network-inline-panel', 'search-panel', 'list-panel'],
+  };
+  let tabsWired = false;
+  function wireTabs() {
+    if (tabsWired) return; tabsWired = true;
+    document.querySelectorAll('.nav-tab').forEach((t) => {
+      t.addEventListener('click', () => switchView(t.getAttribute('data-view')));
+    });
+  }
+  function switchView(view) {
+    document.querySelectorAll('.nav-tab').forEach((t) => {
+      t.classList.toggle('active', t.getAttribute('data-view') === view);
+    });
+    Object.keys(VIEW_PANELS).forEach((v) => {
+      VIEW_PANELS[v].forEach((id) => {
+        const p = el(id); if (p) p.style.display = (v === view) ? 'block' : 'none';
+      });
+    });
+    if (view === 'home') renderRecentlyShuffled();
+    if (view === 'browse') { renderHomeNetworkStrip(); if (!activeNetwork && NETWORKS.length) browseNetwork(NETWORKS[0].id); }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ---------- Recently shuffled hero ----------
+  function renderRecentlyShuffled() {
+    const panel = el('cw-panel');
+    const hero = el('cw-hero');
+    if (!panel || !hero) return;
+    const items = (history || []).slice(0, 4);
+    if (!items.length) { panel.style.display = 'none'; return; }
+    panel.style.display = 'block';
+    hero.innerHTML = items.map((h) => {
+      const poster = h.posterPath ? IMG_BASE + h.posterPath : '';
+      const ep = 'S' + h.season + 'E' + h.episode + (h.epTitle ? ' · ' + escapeHtml(h.epTitle) : '');
+      return '<div class="cw-card" data-cw="' + (h.tmdbId || '') + '">' +
+        (poster ? '<img src="' + poster + '" alt="" onerror="this.style.display=\'none\'">' : '') +
+        '<div class="cw-meta"><div class="cw-title">' + escapeHtml(h.title || '') + '</div>' +
+        '<div class="cw-ep">' + ep + '</div></div></div>';
+    }).join('');
+    hero.querySelectorAll('[data-cw]').forEach((c) => {
+      c.addEventListener('click', () => {
+        switchView('home');
+        doShuffle();
+      });
+    });
   }
   el('region-select').addEventListener('change', (e) => {
     region = e.target.value;
@@ -1636,7 +1706,7 @@
   }
 
   function renderNetworkStrip() {
-    const strip = el('network-strip');
+    const strip = el('home-net-strip');
     if (!strip) return;
     // Only show networks that verified (or haven't been checked yet).
     const shown = NETWORKS.filter((n) => networkOk[n.id] !== false);
@@ -1656,11 +1726,13 @@
     });
   }
 
+  function renderHomeNetworkStrip() { renderNetworkStrip(); }
+
   async function browseNetwork(netId) {
     activeNetwork = netId;
     renderNetworkStrip();
-    el('network-hint').style.display = 'none';
-    const box = el('network-results');
+    const hint = el('home-net-hint'); if (hint) hint.style.display = 'none';
+    const box = el('home-net-results');
     box.innerHTML = '<div class="empty">Loading…</div>';
     try {
       // Pull several pages of English/US shows so it feels like the whole network.
@@ -1682,7 +1754,7 @@
     }
   }
   function renderNetworkResults(results) {
-    const box = el('network-results');
+    const box = el('home-net-results');
     box.innerHTML = '';
     results.forEach((show) => {
       const card = document.createElement('div');
@@ -1706,21 +1778,6 @@
   }
 
   // ---------- Clear entire list (two-step confirm) ----------
-  let networkPageWired = false;
-  function wireNetworkPage() {
-    if (networkPageWired) return;
-    const openBtn = el('open-networks');
-    const backBtn = el('network-back');
-    if (!openBtn || !backBtn) return;
-    networkPageWired = true;
-    openBtn.addEventListener('click', () => {
-      el('network-page').style.display = 'flex';
-      renderNetworkStrip();
-      if (!activeNetwork) browseNetwork(NETWORKS[0].id); // land on Cartoon Network
-    });
-    backBtn.addEventListener('click', () => { el('network-page').style.display = 'none'; });
-  }
-
   let clearListWired = false;
   function wireClearList() {
     const btn = el('clear-list-btn');
@@ -1877,6 +1934,8 @@
       season: episode.season_number,
       episode: episode.episode_number,
       epTitle: (episode.name || '') + (episode.pairEp && episode.pairEp.name ? ' / ' + episode.pairEp.name : ''),
+      tmdbId: show.tmdbId,
+      posterPath: show.posterPath || null,
     });
     history = history.slice(0, 10);
     // Remember it so shuffle skips it for a while (last 25 watched).
