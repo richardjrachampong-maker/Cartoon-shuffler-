@@ -571,16 +571,15 @@
   }
   .network-strip::-webkit-scrollbar { display: none; }
   .network-chip {
-    flex: 0 0 auto; border: 1px solid var(--border); background: var(--bg-elev-2);
-    color: var(--text); border-radius: 40px; padding: 9px 16px; font-weight: 700;
+    flex: 0 0 auto; border: 1px solid var(--border); background: #fff;
+    color: #111; border-radius: 40px; padding: 10px 18px; font-weight: 700;
     font-family: 'Sora', sans-serif; font-size: 0.82rem; cursor: pointer; white-space: nowrap;
-    transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-    display: inline-flex; align-items: center; gap: 8px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    display: inline-flex; align-items: center; justify-content: center; min-height: 44px;
   }
-  .network-chip img { height: 20px; width: auto; max-width: 46px; object-fit: contain; filter: brightness(0) invert(1); opacity: 0.95; }
-  .network-chip.active img { filter: none; }
+  .network-chip img { height: 24px; width: auto; max-width: 100px; object-fit: contain; display: block; }
   .network-chip:hover { transform: translateY(-2px); }
-  .network-chip.active { background: var(--gradient); border-color: transparent; color: #fff; }
+  .network-chip.active { box-shadow: 0 0 0 3px var(--accent), 0 6px 18px rgba(124,92,255,0.45); }
   .network-heading { font-size: 0.8rem; color: var(--text-dim); margin: 2px 0 8px; }
 
   /* Full-screen network browse page */
@@ -1613,33 +1612,47 @@
   ];
   let activeNetwork = null;
   const networkLogos = {}; // id -> logo path (fetched from TMDB), or false if none
+  const networkOk = {};    // id -> true if TMDB's real name matches our label
 
-  async function fetchNetworkLogo(id) {
-    if (networkLogos[id] !== undefined) return networkLogos[id];
+  function normName(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+
+  async function fetchNetworkMeta(n) {
+    if (networkOk[n.id] !== undefined) return;
+    // 1) Verify the ID really is the network we think it is (prevents e.g.
+    //    Disney XD's slot actually pulling WGN America).
     try {
-      const data = await tmdbFetch('/network/' + id + '/images', {});
+      const meta = await tmdbFetch('/network/' + n.id, {});
+      const real = normName(meta && meta.name);
+      const want = normName(n.name);
+      networkOk[n.id] = !!(real && (real.indexOf(want) !== -1 || want.indexOf(real) !== -1));
+    } catch (e) { networkOk[n.id] = false; }
+    // 2) Grab a logo for the chip.
+    try {
+      const data = await tmdbFetch('/network/' + n.id + '/images', {});
       const logos = data.logos || [];
-      // prefer a light/PNG logo that shows on dark backgrounds
       const pick = logos.find((l) => (l.file_path || '').toLowerCase().endsWith('.png')) || logos[0];
-      networkLogos[id] = pick ? pick.file_path : false;
-    } catch (e) { networkLogos[id] = false; }
-    return networkLogos[id];
+      networkLogos[n.id] = pick ? pick.file_path : false;
+    } catch (e) { networkLogos[n.id] = false; }
   }
 
   function renderNetworkStrip() {
     const strip = el('network-strip');
     if (!strip) return;
-    strip.innerHTML = NETWORKS.map((n) => {
+    // Only show networks that verified (or haven't been checked yet).
+    const shown = NETWORKS.filter((n) => networkOk[n.id] !== false);
+    strip.innerHTML = shown.map((n) => {
       const logo = networkLogos[n.id];
-      const inner = logo ? '<img src="https://image.tmdb.org/t/p/h30' + logo + '" alt="' + escapeHtml(n.name) + '" onerror="this.remove()">' + '<span>' + escapeHtml(n.name) + '</span>' : escapeHtml(n.name);
-      return '<button class="network-chip' + (activeNetwork === n.id ? ' active' : '') + '" data-net="' + n.id + '">' + inner + '</button>';
+      const inner = logo
+        ? '<img src="https://image.tmdb.org/t/p/h30' + logo + '" alt="' + escapeHtml(n.name) + '" title="' + escapeHtml(n.name) + '" onerror="this.parentNode.textContent=\'' + escapeHtml(n.name) + '\'">'
+        : escapeHtml(n.name);
+      return '<button class="network-chip' + (activeNetwork === n.id ? ' active' : '') + '" data-net="' + n.id + '" title="' + escapeHtml(n.name) + '">' + inner + '</button>';
     }).join('');
     strip.querySelectorAll('[data-net]').forEach((b) => {
       b.addEventListener('click', () => browseNetwork(parseInt(b.getAttribute('data-net'), 10)));
     });
-    // lazy-load logos, then re-render once they arrive
+    // lazily verify + load logos, then re-render as results arrive
     NETWORKS.forEach((n) => {
-      if (networkLogos[n.id] === undefined) fetchNetworkLogo(n.id).then(() => renderNetworkStrip());
+      if (networkOk[n.id] === undefined) fetchNetworkMeta(n).then(() => renderNetworkStrip());
     });
   }
 
