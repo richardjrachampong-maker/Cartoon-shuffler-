@@ -1605,15 +1605,17 @@
   function updateWmStatus() {
     const btn = el('wm-status');
     if (!btn) return;
+    // Owner-only control — hidden from everyone else.
+    if (!isAdmin()) { btn.style.display = 'none'; return; }
+    btn.style.display = '';
     if (watchmodeKey) { btn.textContent = '⚡ auto-links: on'; btn.classList.add('on'); }
     else { btn.textContent = '⚡ auto-links: off'; btn.classList.remove('on'); }
   }
   el('wm-status').addEventListener('click', () => {
-    const code = prompt('Enter your access code to view or change the API key:');
-    if (code === null) return;
-    if (code !== VIEW_KEY_CODE) { alert('Incorrect code.'); return; }
+    if (!isAdmin()) return; // safety: non-admins can't reach this
+    // Admin doesn't need the access code.
     const k = prompt(
-      'Access granted.\n\nCurrent key is shown below. Edit it to change, or leave it to keep.\n(Clear it and press OK to turn auto-links off.)'
+      'Auto-links (Watchmode API key).\n\nEdit to change, or leave to keep.\n(Clear it and press OK to turn auto-links off.)'
       , watchmodeKey || '');
     if (k === null) return;
     watchmodeKey = k.trim();
@@ -3892,6 +3894,8 @@
     if (ytGlobalBlocked.join(',') !== prevGlobal) ytClearLookupCaches(); // new blocks -> re-check
     // Admin FAB visibility
     el('admin-fab').style.display = isAdmin() ? 'block' : 'none';
+    // Owner-only auto-links control follows admin status too.
+    if (typeof updateWmStatus === 'function') updateWmStatus();
   }
 
   function showGate(title, msg) {
