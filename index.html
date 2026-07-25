@@ -677,6 +677,29 @@
   .cw-card .cw-title { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 0.92rem; line-height: 1.15; }
   .cw-empty { color: var(--text-dim); padding: 20px 0; }
 
+  /* ---------- Coverflow carousel (center card pops, sides curve away) ---------- */
+  .coverflow {
+    display: flex; gap: 0; overflow-x: auto; padding: 24px 50%; /* 50% padding centers first/last */
+    -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    scroll-snap-type: x mandatory; perspective: 1100px;
+  }
+  .coverflow::-webkit-scrollbar { display: none; }
+  .cf-card {
+    flex: 0 0 auto; width: 150px; margin: 0 -14px; scroll-snap-align: center;
+    cursor: pointer; text-align: center;
+    transition: transform .28s cubic-bezier(.2,.7,.3,1), opacity .28s ease;
+    transform-style: preserve-3d;
+  }
+  .cf-poster { width: 150px; aspect-ratio: 2/3; border-radius: 16px; overflow: hidden; position: relative;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.5); border: 2px solid transparent; }
+  .cf-poster.added { border-color: var(--teal); }
+  .cf-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cf-tag { position: absolute; left: 8px; right: 8px; bottom: 8px; border-radius: 9px; font-weight: 800; font-size: 0.78rem; padding: 6px 0; background: rgba(7,8,15,0.8); color: #fff; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  .cf-tag.added { background: rgba(34,211,180,0.95); color: #04231d; }
+  .cf-cname { font-size: 0.75rem; color: var(--text-dim); margin-top: 8px; font-weight: 600; line-height: 1.15; opacity: 0; transition: opacity .28s ease; }
+  .cf-card.cf-center .cf-cname { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .cf-card { transition: none; } }
+
   /* ---------- Glassy onboarding: add cartoons to your list ---------- */
   #onboard {
     position: fixed; inset: 0; z-index: 4700; display: none;
@@ -1645,6 +1668,51 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  // ---------- Coverflow carousel builder (shared by onboard + popular) ----------
+  // items: [{id, poster, name}]; isAdded(id) -> bool; onAdd(id) called on tap.
+  function buildCoverflow(container, items, isAdded, onAdd) {
+    container.classList.add('coverflow');
+    container.innerHTML = items.map((s) =>
+      '<div class="cf-card" data-cfid="' + s.id + '">' +
+        '<div class="cf-poster' + (isAdded(s.id) ? ' added' : '') + '">' +
+          '<img src="' + IMG_BASE + s.poster + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' +
+          '<div class="cf-tag' + (isAdded(s.id) ? ' added' : '') + '" data-cfadd="' + s.id + '">' + (isAdded(s.id) ? 'Added ✓' : '+ Add') + '</div>' +
+        '</div><div class="cf-cname">' + escapeHtml(s.name) + '</div></div>'
+    ).join('');
+    container.querySelectorAll('[data-cfadd]').forEach((b) => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = parseInt(b.getAttribute('data-cfadd'), 10);
+        if (isAdded(id)) return;
+        onAdd(id);
+      });
+    });
+    container.querySelectorAll('.cf-card').forEach((c) => {
+      c.addEventListener('click', () => c.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }));
+    });
+    const paint = () => {
+      const rect = container.getBoundingClientRect();
+      const mid = rect.left + rect.width / 2;
+      container.querySelectorAll('.cf-card').forEach((c) => {
+        const cr = c.getBoundingClientRect();
+        const cc = cr.left + cr.width / 2;
+        const d = Math.max(-1.6, Math.min(1.6, (cc - mid) / (rect.width / 2)));
+        const scale = Math.max(0.7, 1 - Math.abs(d) * 0.26);
+        c.style.transform = 'translateX(' + (-d * 12) + 'px) scale(' + scale + ') rotateY(' + (-d * 34) + 'deg)';
+        c.style.opacity = String(Math.max(0.45, 1 - Math.abs(d) * 0.4));
+        c.style.zIndex = String(100 - Math.round(Math.abs(d) * 50));
+        c.classList.toggle('cf-center', Math.abs(d) < 0.35);
+      });
+    };
+    let raf = null;
+    container.addEventListener('scroll', () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => { paint(); raf = null; });
+    });
+    requestAnimationFrame(paint);
+    setTimeout(paint, 120);
+  }
+
   // ---------- Popular CARTOONS (Animation genre, English), by popularity ----------
   let cartoonCache = null;
   async function getPopularCartoons() {
@@ -1665,19 +1733,12 @@
     let shows;
     try { shows = await getPopularCartoons(); }
     catch (e) { grid.innerHTML = '<div class="empty">Couldn\'t load right now.</div>'; return; }
-    grid.innerHTML = shows.map((s) => {
-      const added = list.some((x) => x.tmdbId === s.id);
-      return '<div class="pop-card">' +
-        '<img src="' + IMG_BASE + s.poster_path + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' +
-        '<button class="pop-add' + (added ? ' added' : '') + '" data-pop="' + s.id + '"' + (added ? ' disabled' : '') + '>' + (added ? 'Added' : '+ Add') + '</button>' +
-        '<div class="pop-name">' + escapeHtml(s.name) + '</div></div>';
-    }).join('');
-    grid.querySelectorAll('[data-pop]').forEach((b) => {
-      b.addEventListener('click', async () => {
-        await addShow(parseInt(b.getAttribute('data-pop'), 10), shows);
-        renderPopularCartoons();
-      });
-    });
+    buildCoverflow(
+      grid,
+      shows.map((s) => ({ id: s.id, poster: s.poster_path, name: s.name })),
+      (id) => list.some((x) => x.tmdbId === id),
+      async (id) => { await addShow(id, shows); renderPopularCartoons(); }
+    );
   }
 
   // Cartoon starter strip inside the welcome modal
@@ -1759,25 +1820,16 @@
   }
   async function renderOnboard() {
     const strip = el('onb-strip');
-    strip.innerHTML = '<div class="empty" style="color:#5b4d78;padding:24px;">Loading cartoons…</div>';
+    strip.innerHTML = '<div class="empty" style="padding:24px;">Loading cartoons…</div>';
     let shows;
     try { shows = await getPopularCartoons(); }
-    catch (e) { strip.innerHTML = '<div class="empty" style="color:#5b4d78;">Couldn\'t load — check your connection.</div>'; return; }
-    strip.innerHTML = shows.map((s) => {
-      const added = list.some((x) => x.tmdbId === s.id);
-      return '<div class="onb-card"><div class="onb-poster' + (added ? ' added' : '') + '">' +
-        '<img src="' + IMG_BASE + s.poster_path + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' +
-        '<div class="onb-tag' + (added ? ' added' : '') + '" data-onbadd="' + s.id + '">' + (added ? 'Added ✓' : '+ Add') + '</div>' +
-        '</div><div class="onb-cname">' + escapeHtml(s.name) + '</div></div>';
-    }).join('');
-    strip.querySelectorAll('[data-onbadd]').forEach((b) => {
-      b.addEventListener('click', async () => {
-        const id = parseInt(b.getAttribute('data-onbadd'), 10);
-        if (list.some((x) => x.tmdbId === id)) return;
-        await addShow(id, shows);
-        renderOnboard();
-      });
-    });
+    catch (e) { strip.innerHTML = '<div class="empty">Couldn\'t load — check your connection.</div>'; return; }
+    buildCoverflow(
+      strip,
+      shows.map((s) => ({ id: s.id, poster: s.poster_path, name: s.name })),
+      (id) => list.some((x) => x.tmdbId === id),
+      async (id) => { await addShow(id, shows); renderOnboard(); }
+    );
     updateOnbCount();
   }
   el('onb-back').addEventListener('click', () => {
