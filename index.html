@@ -1680,6 +1680,13 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  // Center a card within its strip WITHOUT scrolling the page vertically.
+  function centerCardX(container, card) {
+    if (!container || !card) return;
+    const target = card.offsetLeft - (container.clientWidth / 2) + (card.offsetWidth / 2);
+    container.scrollTo({ left: target, behavior: 'smooth' });
+  }
+
   // Arc/semicircle effect on an existing horizontal strip (doesn't rebuild cards).
   // Left cards rise + tilt up, right cards drop + tilt down, following a sine arc.
   function applyArc(container) {
@@ -1734,7 +1741,7 @@
         const dist = Math.abs((cr.left + cr.width / 2) - mid);
         if (dist < best) { best = dist; idx = i; }
       });
-      cs[(idx + 1) % cs.length].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      centerCardX(container, cs[(idx + 1) % cs.length]);
     }, 4000);
   }
 
@@ -1758,7 +1765,7 @@
       });
     });
     container.querySelectorAll('.cf-card').forEach((c) => {
-      c.addEventListener('click', () => c.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }));
+      c.addEventListener('click', () => centerCardX(container, c));
     });
     const paint = () => {
       const rect = container.getBoundingClientRect();
@@ -1804,7 +1811,7 @@
         const dist = Math.abs((cr.left + cr.width / 2) - mid);
         if (dist < best) { best = dist; idx = i; }
       });
-      cs[(idx + 1) % cs.length].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      centerCardX(container, cs[(idx + 1) % cs.length]);
     }, 4000);
   }
 
