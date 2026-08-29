@@ -712,6 +712,18 @@
   }
   @media (prefers-reduced-motion: reduce) { .arcflow > * { transition: none; } }
 
+  /* ---------- Holiday shuffle filters ---------- */
+  .holiday-row { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; -webkit-overflow-scrolling: touch; scrollbar-width: none; width: 100%; }
+  .holiday-row::-webkit-scrollbar { display: none; }
+  .holiday-chip {
+    flex: 0 0 auto; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.05);
+    color: var(--text); border-radius: 40px; padding: 7px 14px; font-weight: 700;
+    font-family: 'Sora', sans-serif; font-size: 0.78rem; cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px; transition: all 0.18s ease;
+  }
+  .holiday-chip:hover { transform: translateY(-1px); background: rgba(255,255,255,0.09); }
+  .holiday-chip.active { background: var(--gradient); border-color: transparent; color: #fff; box-shadow: 0 6px 16px rgba(124,92,255,0.4); }
+
   /* ---------- Glassy onboarding: add cartoons to your list ---------- */
   #onboard {
     position: fixed; inset: 0; z-index: 4700; display: none;
@@ -991,6 +1003,7 @@
     </div>
 
     <div class="tv-controls-bottom">
+      <div class="holiday-row" id="holiday-row"></div>
       <div class="filter-row">
         <select id="filter-show">
           <option value="">🎲 All shows</option>
@@ -1360,6 +1373,7 @@
     saveProfiles();
   }
   async function saveList() {
+    clearHolidayScan(); // list changed — rescan themed episodes next time
     saveProfiles();
   }
   async function saveRegion() {
@@ -1648,9 +1662,25 @@
     el('history-panel').style.display = 'block';
     wireTabs();
     renderHomeNetworkStrip();
+    renderHolidayChips();
     wireClearList();
     el('region-select').value = region;
     switchView('home');
+  }
+
+  function renderHolidayChips() {
+    const row = el('holiday-row');
+    if (!row) return;
+    row.innerHTML = HOLIDAYS.map((h) =>
+      '<button class="holiday-chip' + (activeHoliday === h.id ? ' active' : '') + '" data-hol="' + h.id + '">' + h.emoji + ' ' + h.label + '</button>'
+    ).join('');
+    row.querySelectorAll('[data-hol]').forEach((b) => {
+      b.addEventListener('click', () => {
+        const id = b.getAttribute('data-hol');
+        activeHoliday = (activeHoliday === id) ? null : id; // tap again to turn off
+        renderHolidayChips();
+      });
+    });
   }
 
   // ---------- Tabbed views ----------
@@ -3343,6 +3373,21 @@
   }
 
   async function pickFreshEpisode() {
+    // Holiday mode: scan shows for episodes whose title matches the theme.
+    if (activeHoliday) {
+      const themed = await collectHolidayEpisodes(activeHoliday);
+      if (!themed.length) {
+        const h = HOLIDAYS.find((x) => x.id === activeHoliday);
+        throw new Error('No ' + (h ? h.label : 'themed') + ' episodes found in your shows. Add more shows or try another filter.');
+      }
+      // Prefer unseen themed episodes, else allow a repeat.
+      const unseen = themed.filter((t) => {
+        const key = epKey(t.show.tmdbId, t.episode.season_number, t.episode.episode_number);
+        return recent.indexOf(key) === -1 && sessionSeen.indexOf(key) === -1;
+      });
+      const pickFrom = unseen.length ? unseen : themed;
+      return pickFrom[Math.floor(Math.random() * pickFrom.length)];
+    }
     let fallback = null;
     let pool = list;
     if (filterService) {
@@ -3381,6 +3426,49 @@
     }
     return fallback; // tiny library — allow a repeat rather than nothing
   }
+
+  // ---------- Holiday shuffle filters ----------
+  // TMDB doesn't tag holidays, but themed episodes nearly always say so in the
+  // title. We match episode names against per-holiday keyword lists.
+  const HOLIDAYS = [
+    { id: 'christmas', label: 'Christmas', emoji: '🎄', kw: ['christmas', 'xmas', 'santa', 'holiday', 'noel', 'yule', 'st. nick', 'north pole', 'reindeer', 'jingle', 'sleigh'] },
+    { id: 'halloween', label: 'Halloween', emoji: '🎃', kw: ['halloween', "hallowe'en", 'haunted', 'ghost', 'spooky', 'scary', 'trick or treat', 'costume', 'pumpkin', 'boo', 'nightmare', 'monster', 'witch', 'treehouse of horror', 'fright'] },
+    { id: 'thanksgiving', label: 'Thanksgiving', emoji: '🦃', kw: ['thanksgiving', 'turkey day', 'gobble', 'giving thanks'] },
+    { id: 'hanukkah', label: 'Hanukkah', emoji: '🕎', kw: ['hanukkah', 'chanukah', 'menorah', 'dreidel', 'festival of lights'] },
+    { id: 'easter', label: 'Easter', emoji: '🐰', kw: ['easter', 'bunny', 'egg hunt', 'peep', 'springtime', 'resurrection'] },
+    { id: 'newyear', label: "New Year's", emoji: '🎉', kw: ['new year', "new year's", 'midnight', 'countdown', 'resolution', 'auld lang'] },
+    { id: 'valentine', label: "Valentine's", emoji: '💘', kw: ['valentine', 'valentines', "valentine's", 'sweetheart', 'crush', 'be mine', 'cupid'] },
+    { id: 'stpatrick', label: "St. Patrick's", emoji: '🍀', kw: ["st. patrick", 'st patrick', 'leprechaun', 'shamrock', 'lucky', 'pot of gold', 'green'] },
+    { id: 'july4', label: 'Fourth of July', emoji: '🎆', kw: ['fourth of july', '4th of july', 'independence day', 'fireworks', 'red white and blue'] },
+    { id: 'birthday', label: 'Birthday', emoji: '🎂', kw: ['birthday', 'b-day', 'surprise party'] },
+  ];
+  let activeHoliday = null;
+
+  // Scan every show's seasons for episodes whose title matches the holiday.
+  const holidayScanCache = {}; // holidayId -> [{show, episode}]
+  async function collectHolidayEpisodes(holidayId) {
+    if (holidayScanCache[holidayId]) return holidayScanCache[holidayId];
+    const h = HOLIDAYS.find((x) => x.id === holidayId);
+    if (!h) return [];
+    const found = [];
+    for (const show of list) {
+      const seasons = show.numberOfSeasons || 1;
+      for (let sn = 1; sn <= seasons; sn++) {
+        let eps = [];
+        try { eps = await getSeasonEpisodes(show.tmdbId, sn); } catch (e) { continue; }
+        eps.forEach((ep) => {
+          const name = (ep.name || '').toLowerCase();
+          if (!name) return;
+          if (h.kw.some((k) => name.indexOf(k) !== -1)) {
+            found.push({ show, episode: pairSegments(ep, eps, show) });
+          }
+        });
+      }
+    }
+    holidayScanCache[holidayId] = found;
+    return found;
+  }
+  function clearHolidayScan() { Object.keys(holidayScanCache).forEach((k) => delete holidayScanCache[k]); }
 
   // Streaming apps usually combine two short cartoon segments (e.g. 11 min each)
   // into ONE episode, while TMDB lists them separately — which made our names
