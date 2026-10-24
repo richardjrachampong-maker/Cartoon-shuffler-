@@ -719,6 +719,46 @@
   }
   @media (prefers-reduced-motion: reduce) { .arcflow > * { transition: none; } }
 
+  /* ---------- Full-page auth ---------- */
+  #auth-page {
+    position: fixed; inset: 0; z-index: 4650; display: none; align-items: center; justify-content: center;
+    padding: 24px 16px; overflow-y: auto;
+    background: radial-gradient(circle at 50% 10%, rgba(245,181,68,0.16), transparent 48%), #000;
+  }
+  .auth-card {
+    position: relative; width: min(440px, 94vw); border-radius: 24px; padding: 54px 26px 28px;
+    background: var(--bg-elev); border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-soft), var(--glass-hi); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  }
+  .auth-back { position: absolute; top: 14px; left: 14px; background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border); color: var(--text); border-radius: 40px; padding: 7px 14px; font-weight: 700; cursor: pointer; font-family: 'Sora', sans-serif; font-size: 0.8rem; }
+  .auth-logo { width: 64px; height: 64px; border-radius: 18px; display: block; margin: 0 auto 14px; box-shadow: 0 10px 28px rgba(245,181,68,0.35); }
+  #auth-inner .bubble-title { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.5rem; text-align: center; margin-bottom: 16px; }
+  #auth-inner input[type="text"], #auth-inner input[type="password"] { margin-bottom: 10px; padding: 13px 15px; font-size: 1rem; }
+  #auth-inner .bubble-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+  #auth-inner .bubble-actions .btn { width: 100%; padding: 13px 18px; font-size: 0.95rem; border-radius: 12px; }
+  #auth-inner .bubble-fineprint { font-size: 0.72rem; color: var(--text-dim); text-align: center; margin-top: 14px; line-height: 1.4; }
+  .auth-remember { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; font-size: 0.9rem; color: var(--text); cursor: pointer; user-select: none; }
+  .auth-remember input { width: 20px; height: 20px; accent-color: #F5B544; }
+  body.light-mode #auth-page { background: radial-gradient(circle at 50% 10%, rgba(217,149,31,0.18), transparent 48%), #FAF7F0; }
+
+  /* ---------- TV mode ---------- */
+  .tv-panel { padding: 22px 20px 26px; }
+  .tv-sub { color: var(--text-dim); margin: 6px 0 0; font-size: 0.92rem; line-height: 1.45; }
+  .tv-pickhint { font-weight: 400; opacity: 0.7; }
+  .tv-opts { display: flex; gap: 8px; margin: 6px 0 18px; flex-wrap: wrap; }
+  .tv-play-wrap { text-align: center; }
+  .tv-play {
+    border: none; border-radius: 60px; padding: 18px 54px; cursor: pointer;
+    font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.25rem; color: #1B1300;
+    background: var(--gradient); box-shadow: 0 14px 36px rgba(245,181,68,0.35), inset 0 1px 0 rgba(255,255,255,0.3);
+    display: inline-flex; align-items: center; gap: 8px; transition: transform .16s ease, box-shadow .2s ease, opacity .2s ease;
+  }
+  .tv-play:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 18px 44px rgba(245,181,68,0.45), inset 0 1px 0 rgba(255,255,255,0.3); }
+  .tv-play:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+  .tv-status { color: var(--text-dim); font-size: 0.85rem; margin-top: 12px; min-height: 1.2em; }
+  #tv-net-strip .network-chip.picked { box-shadow: 0 0 0 3px #F5B544, 0 6px 18px rgba(245,181,68,0.45); }
+  .theater-chan { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: #F5B544; font-weight: 800; display: block; margin-bottom: 2px; }
+
   /* ---------- Holiday shuffle filters ---------- */
   .holiday-row { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 10px; -webkit-overflow-scrolling: touch; scrollbar-width: none; width: 100%; }
   .holiday-row::-webkit-scrollbar { display: none; }
@@ -869,6 +909,15 @@
   </div>
 </div>
 
+<!-- Full-page login / sign-up -->
+<div id="auth-page">
+  <div class="auth-card">
+    <button class="auth-back" id="auth-back">← Back</button>
+    <img src="logo-tv-192.png" alt="" class="auth-logo" onerror="this.style.display='none'">
+    <div id="auth-inner"></div>
+  </div>
+</div>
+
 <!-- Glassy welcome / about modal for new & logged-out visitors -->
 <div id="welcome-modal">
   <div class="wm-card">
@@ -937,11 +986,29 @@
   <nav class="top-nav" id="top-nav" style="display:none;">
     <button class="nav-tab active" data-view="home"><span class="ic" data-ic="home"></span>Home</button>
     <button class="nav-tab" data-view="browse"><span class="ic" data-ic="browse"></span>Browse</button>
+    <button class="nav-tab" data-view="tv"><span class="ic" data-ic="tv"></span>TV</button>
   </nav>
 
   <div class="panel" id="cw-panel" style="display:none;">
     <h2><span class="ic" data-ic="play"></span>Recently shuffled</h2>
     <div class="cw-hero" id="cw-hero"></div>
+  </div>
+
+  <div class="panel tv-panel" id="tv-panel" style="display:none;">
+    <div class="tv-head">
+      <h2 style="margin:0;"><span class="ic" data-ic="tv"></span>Turn on the TV</h2>
+      <p class="tv-sub">Pick a channel — or a few — and press play. It just plays, episode after episode. No clicking.</p>
+    </div>
+    <div class="network-heading" style="margin-top:10px;">Channels <span class="tv-pickhint" id="tv-pickhint">(tap to pick, tap again to remove)</span></div>
+    <div class="home-net-strip" id="tv-net-strip"></div>
+    <div class="tv-opts">
+      <button class="holiday-chip active" id="tv-cartoons">Cartoons only</button>
+      <button class="holiday-chip" id="tv-mylist">Include my shows</button>
+    </div>
+    <div class="tv-play-wrap">
+      <button class="tv-play" id="tv-play" disabled><span class="ic" data-ic="play"></span>Play</button>
+      <div class="tv-status" id="tv-status">Pick at least one channel.</div>
+    </div>
   </div>
 
   <div class="panel" id="popular-panel" style="display:none;">
@@ -1693,6 +1760,7 @@
   const VIEW_PANELS = {
     home: ['shuffle-panel', 'list-panel', 'cw-panel', 'history-panel'],
     browse: ['popular-panel', 'network-inline-panel', 'search-panel'],
+    tv: ['tv-panel'],
   };
   let tabsWired = false;
   function wireTabs() {
@@ -1712,6 +1780,7 @@
     });
     if (view === 'home') renderRecentlyShuffled();
     if (view === 'browse') { renderPopularCartoons(); renderHomeNetworkStrip(); if (!activeNetwork && NETWORKS.length) browseNetwork(NETWORKS[0].id); }
+    if (view === 'tv') renderTvStrip();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -3027,7 +3096,7 @@
   }
 
   function theaterTitleText(show, episode) {
-    return show.title + ' · S' + episode.season_number + 'E' + episode.episode_number +
+    return (tvActive ? '\u{1F4FA} ' + tvLabel + '  \u2022  ' : '') + show.title + ' · S' + episode.season_number + 'E' + episode.episode_number +
       (episode.name ? ' · ' + episode.name : '');
   }
 
@@ -3052,7 +3121,7 @@
         '<span style="display:flex; gap:8px; flex:0 0 auto;">' +
           (chanInfo && chanInfo.id ? '<button class="btn btn-ghost btn-small" id="theater-block">🚫 Block channel</button>' : '') +
           (startAt > 0 ? '<button class="btn btn-ghost btn-small" id="theater-restart">↺ Start over</button>' : '') +
-          '<button class="btn btn-ghost btn-small" id="theater-stop">✕ Stop watching</button>' +
+          '<button class="btn btn-ghost btn-small" id="theater-stop">' + (tvActive ? '⏻ Turn off TV' : '✕ Stop watching') + '</button>' +
         '</span>' +
       '</div>' +
       '<div class="theater-stage"><div class="frame"><div id="yt-player-host"></div></div></div>' +
@@ -3154,6 +3223,7 @@
   let stoppedEpKey = null;
 
   function closeTheater(saveProgress) {
+    if (saveProgress && tvActive) exitTV(); // explicit stop = TV off
     if (theaterInterval) { clearInterval(theaterInterval); theaterInterval = null; }
     if (saveProgress) captureResume();
     if (theaterPlayer) { try { theaterPlayer.destroy(); } catch (e) {} theaterPlayer = null; }
@@ -3195,6 +3265,10 @@
   async function advanceOnSite() {
     let next = pendingNext;
     pendingNext = null;
+    if (tvActive && (!next || !next.videoId)) {
+      next = await tvFindPlayable(12);
+      if (!next) { closeTheater(false); exitTV(); const st = el('tv-status'); if (st) st.textContent = 'Ran out of playable episodes for now — pick another channel.'; switchView('tv'); return; }
+    }
     if (!next) {
       try {
         const p = await pickFreshEpisode();
@@ -3377,9 +3451,118 @@
     return show.providerKeys;
   }
 
+  // ===================== TV MODE =====================
+  // "Just turn on the TV": pick channels, press play, it chains random episodes
+  // from those networks' shows via official YouTube uploads — no clicks.
+  let tvActive = false, tvPool = [], tvLabel = '', tvPrevAutoplay = null;
+  const tvPicked = new Set();
+  let tvCartoonsOnly = true, tvIncludeList = false;
+
+  function renderTvStrip() {
+    const strip = el('tv-net-strip');
+    if (!strip) return;
+    const shown = NETWORKS.filter((n) => networkOk[n.name] !== false);
+    strip.innerHTML = shown.map((n) => {
+      const id = networkOk[n.name];
+      const logo = id ? networkLogos[id] : null;
+      const inner = logo
+        ? '<img src="https://image.tmdb.org/t/p/h30' + logo + '" alt="' + escapeHtml(n.name) + '" title="' + escapeHtml(n.name) + '" onerror="this.parentNode.textContent=\'' + escapeHtml(n.name) + '\'">'
+        : escapeHtml(n.name);
+      return '<button class="network-chip' + (id && tvPicked.has(id) ? ' picked' : '') + '" data-tvnet="' + (id || '') + '" data-tvname="' + escapeHtml(n.name) + '" title="' + escapeHtml(n.name) + '">' + inner + '</button>';
+    }).join('');
+    strip.querySelectorAll('[data-tvnet]').forEach((b) => {
+      const id = parseInt(b.getAttribute('data-tvnet'), 10);
+      if (!id) return;
+      b.addEventListener('click', () => {
+        if (tvPicked.has(id)) tvPicked.delete(id); else tvPicked.add(id);
+        renderTvStrip(); updateTvPlay();
+      });
+    });
+    NETWORKS.forEach((n) => { if (networkOk[n.name] === undefined) resolveNetwork(n).then(() => renderTvStrip()); });
+    updateTvPlay();
+  }
+  function tvPickedNames() {
+    return NETWORKS.filter((n) => tvPicked.has(networkOk[n.name])).map((n) => n.name);
+  }
+  function updateTvPlay() {
+    const btn = el('tv-play'); const st = el('tv-status');
+    if (!btn) return;
+    const ok = tvPicked.size > 0 || (tvIncludeList && list.length > 0);
+    btn.disabled = !ok;
+    if (st && !tvActive) st.textContent = ok ? (tvPicked.size ? tvPickedNames().join(' + ') : 'My shows') + ' — press play.' : 'Pick at least one channel.';
+  }
+  (function wireTv() {
+    const c = el('tv-cartoons'), m = el('tv-mylist'), p = el('tv-play');
+    if (c) c.addEventListener('click', () => { tvCartoonsOnly = !tvCartoonsOnly; c.classList.toggle('active', tvCartoonsOnly); });
+    if (m) m.addEventListener('click', () => { tvIncludeList = !tvIncludeList; m.classList.toggle('active', tvIncludeList); updateTvPlay(); });
+    if (p) p.addEventListener('click', startTV);
+  })();
+
+  function shuffleArr(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+  async function buildTvPool() {
+    const seen = {}; const pool = [];
+    const add = (s) => { if (!seen[s.tmdbId]) { seen[s.tmdbId] = 1; pool.push(s); } };
+    if (tvIncludeList) list.forEach(add);
+    const ids = Array.from(tvPicked);
+    for (const netId of ids) {
+      const pages = await Promise.all([1, 2, 3].map((page) => {
+        const params = { with_networks: netId, sort_by: 'popularity.desc', with_original_language: 'en', page };
+        if (tvCartoonsOnly) params.with_genres = 16;
+        return tmdbFetch('/discover/tv', params).catch(() => ({ results: [] }));
+      }));
+      pages.forEach((d) => (d.results || []).forEach((r) => {
+        if (!r.poster_path) return;
+        add({ tmdbId: r.id, title: r.name, posterPath: r.poster_path, numberOfSeasons: 0, avgRuntimeMin: 22, fetchedAt: Date.now() });
+      }));
+    }
+    return shuffleArr(pool);
+  }
+
+  async function startTV() {
+    const st = el('tv-status'); const btn = el('tv-play');
+    btn.disabled = true;
+    st.textContent = 'Tuning in…';
+    try {
+      tvPool = await buildTvPool();
+      if (!tvPool.length) { st.textContent = 'No shows found for those channels. Try different ones.'; btn.disabled = false; return; }
+      tvLabel = tvPicked.size ? tvPickedNames().join(' + ') : 'My shows';
+      tvActive = true;
+      tvPrevAutoplay = autoplay; autoplay = true;
+      const first = await tvFindPlayable(12);
+      if (!first) {
+        exitTV();
+        st.textContent = 'Couldn\'t find any episodes on YouTube for these channels right now (no official uploads, or today\'s lookup limit). Try another channel or come back later.';
+        btn.disabled = false; return;
+      }
+      st.textContent = 'Now on: ' + tvLabel;
+      startSitePlayback(first.show, first.episode, first.videoId);
+    } catch (e) {
+      exitTV(); st.textContent = 'Something went wrong tuning in — try again.'; btn.disabled = false;
+    }
+  }
+  // Keep picking until we land on an episode YouTube actually has.
+  async function tvFindPlayable(maxTries) {
+    for (let i = 0; i < maxTries; i++) {
+      let p = null;
+      try { p = await pickFreshEpisode(); } catch (e) { p = null; }
+      if (!p) continue;
+      const f = await findYouTubeEpisode(p.show, p.episode);
+      if (f && f.videoId) { rememberChannel(f); return { show: p.show, episode: p.episode, videoId: f.videoId }; }
+    }
+    return null;
+  }
+  function exitTV() {
+    if (!tvActive) return;
+    tvActive = false; tvPool = [];
+    if (tvPrevAutoplay !== null) { autoplay = tvPrevAutoplay; tvPrevAutoplay = null; }
+    const btn = el('tv-play'); if (btn) btn.disabled = false;
+    updateTvPlay();
+  }
+
   async function pickFreshEpisode() {
     // Holiday mode: scan shows for episodes whose title matches the theme.
-    if (activeHoliday) {
+    if (activeHoliday && !tvActive) {
       const themed = await collectHolidayEpisodes(activeHoliday);
       if (!themed.length) {
         const h = HOLIDAYS.find((x) => x.id === activeHoliday);
@@ -3394,8 +3577,8 @@
       return pickFrom[Math.floor(Math.random() * pickFrom.length)];
     }
     let fallback = null;
-    let pool = list;
-    if (filterService) {
+    let pool = (tvActive && tvPool.length) ? tvPool : list;
+    if (filterService && !tvActive) {
       const matches = [];
       for (const s of list) {
         const keys = await ensureProviders(s);
@@ -3411,6 +3594,14 @@
 
     for (let attempt = 0; attempt < 12; attempt++) {
       const show = pool[Math.floor(Math.random() * pool.length)];
+      if (!show.numberOfSeasons) {
+        // TV-pool shows arrive without season counts — fetch once, on demand.
+        try {
+          const d = await getShowDetails(show.tmdbId);
+          show.numberOfSeasons = d.number_of_seasons || 1;
+          if (d.episode_run_time && d.episode_run_time.length) show.avgRuntimeMin = d.episode_run_time[0];
+        } catch (e) { show.numberOfSeasons = 1; }
+      }
       const seasonNumber = 1 + Math.floor(Math.random() * show.numberOfSeasons);
       let episodes = [];
       try { episodes = await getSeasonEpisodes(show.tmdbId, seasonNumber); } catch (e) { /* try another */ }
@@ -4122,13 +4313,29 @@
   }
 
   // Real email/password auth via Firebase.
+  function openAuthPage() { el('account-bubble').style.display = 'none'; el('auth-page').style.display = 'flex'; }
+  function closeAuthPage() { el('auth-page').style.display = 'none'; }
+  (function wireAuthPage() { const b = el('auth-back'); if (b) b.addEventListener('click', closeAuthPage); })();
+  function rememberPref() { try { return localStorage.getItem('ss-remember') !== '0'; } catch (e) { return true; } }
+  async function applyRemember(on) {
+    try { localStorage.setItem('ss-remember', on ? '1' : '0'); } catch (e) {}
+    if (!fbEnabled) return;
+    try {
+      const P = firebase.auth.Auth.Persistence;
+      await fbAuth.setPersistence(on ? P.LOCAL : P.SESSION); // LOCAL = stays logged in across visits
+    } catch (e) {}
+  }
+
   function showAuthForm(mode) {
     const signup = mode === 'signup';
-    el('bubble-inner').innerHTML =
+    openAuthPage();
+    let lastEmail = ''; try { lastEmail = localStorage.getItem('ss-last-email') || ''; } catch (e) {}
+    el('auth-inner').innerHTML =
       '<div class="bubble-title">' + (signup ? 'Create your account' : 'Log in') + '</div>' +
       (signup ? '<input type="text" id="fb-username" placeholder="Username (optional)" autocomplete="username" />' : '') +
       '<input type="text" id="fb-id" placeholder="' + (signup ? 'Email' : 'Email or username') + '" autocomplete="' + (signup ? 'email' : 'username') + '" />' +
       '<input type="password" id="fb-pw" placeholder="Password" autocomplete="' + (signup ? 'new-password' : 'current-password') + '" />' +
+      '<label class="auth-remember"><input type="checkbox" id="fb-remember"' + (rememberPref() ? ' checked' : '') + '> Remember me on this device</label>' +
       '<div class="error-msg" id="fb-error" style="display:none; margin-top:6px;"></div>' +
       '<div class="bubble-actions">' +
         '<button class="btn btn-small" id="fb-go">' + (signup ? 'Create account' : 'Log in') + '</button>' +
@@ -4137,9 +4344,12 @@
         '<button class="btn btn-ghost btn-small" id="fb-switch">' + (signup ? 'I already have an account' : 'Create an account') + '</button>' +
       '</div>' +
       '<div class="bubble-fineprint">Your shows sync securely to the cloud and to any device you log in on.</div>';
+    if (!signup && lastEmail && !el('fb-id').value) el('fb-id').value = lastEmail; // remembered
     el('fb-id').focus();
+    el('fb-remember').addEventListener('change', (e) => applyRemember(e.target.checked));
+    applyRemember(el('fb-remember').checked);
     el('fb-switch').addEventListener('click', () => showAuthForm(signup ? 'signin' : 'signup'));
-    el('fb-google').addEventListener('click', fbGoogleSignIn);
+    el('fb-google').addEventListener('click', async () => { await applyRemember(el('fb-remember').checked); fbGoogleSignIn(); });
     const err = el('fb-error');
     const fail = (m) => { err.textContent = m; err.style.display = 'block'; };
     const ok = (m) => { err.style.color = 'var(--teal)'; err.textContent = m; err.style.display = 'block'; };
@@ -4163,6 +4373,7 @@
       if (!idField || !pw) { fail('Enter your ' + (signup ? 'email' : 'email/username') + ' and password.'); return; }
       if (signup && pw.length < 6) { fail('Password must be at least 6 characters.'); return; }
       el('fb-go').disabled = true;
+      await applyRemember(el('fb-remember').checked);
       try {
         if (signup) {
           if (username) {
@@ -4179,6 +4390,8 @@
           const email = await fbResolveEmail(idField);
           await fbAuth.signInWithEmailAndPassword(email, pw);
         }
+        if (el('fb-remember').checked) { try { localStorage.setItem('ss-last-email', idField.indexOf('@') !== -1 ? idField : ''); } catch (e) {} }
+        closeAuthPage();
         el('account-bubble').style.display = 'none';
       } catch (e) {
         el('fb-go').disabled = false;
@@ -4889,6 +5102,7 @@
     await loadSiteConfig(); // announcement, verse override, maintenance/ban gate
     if (fbEnabled) {
       fbAuth.onAuthStateChanged(function (u) {
+        if (u) closeAuthPage();
         fbOnUser(u);
         // Re-apply config once we know who's signed in (admin FAB, bans, maintenance bypass)
         loadSiteConfig();
