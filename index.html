@@ -15,25 +15,26 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0A0B14;
-    --bg-elev: #14162A;
-    --bg-elev-2: #1C1F3A;
-    --text: #F4F1FF;
-    --text-dim: rgba(244,241,255,0.62);
-    --accent: #7C5CFF;
-    --accent-2: #FF3E7F;
-    --teal: #22D3B4;
-    --gold: #FFB020;
-    --border: rgba(255,255,255,0.09);
+    /* Sunset Arcade: deep petrol teal, coral + raspberry sunset, mint, gold */
+    --bg: #06181B;
+    --bg-elev: #0C272B;
+    --bg-elev-2: #123439;
+    --text: #F0FBF4;
+    --text-dim: rgba(240,251,244,0.62);
+    --accent: #FF5C39;
+    --accent-2: #FF2E63;
+    --teal: #45E6B0;
+    --gold: #FFD23F;
+    --border: rgba(240,251,244,0.12);
     --gradient: linear-gradient(135deg, var(--accent), var(--accent-2));
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0;
     background: var(--bg);
-    background-image: radial-gradient(circle at 20% 0%, rgba(124,92,255,0.18), transparent 45%),
-                       radial-gradient(circle at 85% 15%, rgba(255,62,127,0.14), transparent 40%),
-                       radial-gradient(circle at 50% 110%, rgba(34,211,180,0.10), transparent 55%);
+    background-image: radial-gradient(circle at 20% 0%, rgba(255,92,57,0.15), transparent 45%),
+                       radial-gradient(circle at 85% 15%, rgba(255,210,63,0.10), transparent 40%),
+                       radial-gradient(circle at 50% 110%, rgba(69,230,176,0.09), transparent 55%);
     color: var(--text);
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
@@ -64,7 +65,7 @@
   .hero h1 {
     font-size: clamp(2.7rem, 8vw, 4.4rem);
     letter-spacing: -0.035em;
-    filter: drop-shadow(0 0 28px rgba(124,92,255,0.5));
+    filter: drop-shadow(0 0 28px rgba(255,92,57,0.45));
   }
   .hero-eyebrow {
     display: inline-flex; align-items: center; gap: 9px;
@@ -89,7 +90,7 @@
   .color-bars i:nth-child(4) { background: #39d353; }
   .color-bars i:nth-child(5) { background: #ff3e7f; }
   .color-bars i:nth-child(6) { background: #ff5349; }
-  .color-bars i:nth-child(7) { background: #7c5cff; }
+  .color-bars i:nth-child(7) { background: #2fb6ff; }
   .hero-tag { font-size: 0.96rem; margin-top: 16px; color: var(--text-dim); }
 
   /* ---- Tab bar ---- */
@@ -97,7 +98,7 @@
     position: sticky; top: 12px; z-index: 60;
     justify-content: center; gap: 6px;
     margin: 22px auto 28px; padding: 6px; width: fit-content;
-    background: rgba(13, 13, 24, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    background: rgba(5, 20, 22, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
     border: 1px solid var(--border); border-radius: 999px;
   }
   .tab-btn {
@@ -107,7 +108,7 @@
     transition: color 0.15s ease, background 0.15s ease;
   }
   .tab-btn:hover { color: var(--text); }
-  .tab-btn.active { background: var(--gradient); color: #fff; box-shadow: 0 6px 20px rgba(255,62,127,0.35); }
+  .tab-btn.active { background: var(--gradient); color: #fff; box-shadow: 0 6px 20px rgba(255,92,57,0.4); }
 
   /* ---- Settings groups + channel numbers ---- */
   .channel-no { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 0.2em; color: var(--text-dim); margin-bottom: 8px; }
@@ -115,6 +116,60 @@
   .set-group h3 { font-family: 'Sora', sans-serif; font-size: 0.98rem; margin: 0 0 8px; color: var(--gold); }
   .set-hint { font-size: 0.8rem; color: var(--text-dim); margin: 8px 0 0; line-height: 1.5; }
   .set-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ---- First-visit welcome ---- */
+  .welcome-overlay {
+    position: fixed; inset: 0; z-index: 500; overflow-y: auto;
+    background: var(--bg);
+    background-image: radial-gradient(circle at 50% -10%, rgba(255,92,57,0.2), transparent 55%),
+                      radial-gradient(circle at 15% 90%, rgba(69,230,176,0.14), transparent 45%),
+                      repeating-linear-gradient(0deg, rgba(255,255,255,0.028) 0 1px, transparent 1px 3px);
+    display: flex; align-items: center; justify-content: center; padding: 30px 18px;
+  }
+  .welcome-card { max-width: 560px; text-align: center; }
+  .welcome-title {
+    font-family: 'Sora', sans-serif; font-weight: 800; margin: 0;
+    font-size: clamp(2.8rem, 10vw, 4.6rem); letter-spacing: -0.035em;
+    background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 30px rgba(255,92,57,0.45));
+  }
+  .welcome-sub { color: var(--text-dim); font-size: 1rem; margin: 18px 0 26px; line-height: 1.55; }
+  .welcome-steps { text-align: left; display: flex; flex-direction: column; gap: 14px; margin-bottom: 30px; }
+  .w-step {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px;
+    font-size: 0.9rem; line-height: 1.5; color: var(--text-dim);
+  }
+  .w-step strong { color: var(--text); font-family: 'Sora', sans-serif; }
+  .w-num {
+    flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--gradient); color: #fff; font-family: 'Sora', sans-serif; font-weight: 800;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 0.95rem;
+  }
+  .welcome-actions { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+
+  /* ---- Channel poster collage ---- */
+  .channel-art { position: relative; display: flex; align-items: flex-end; height: 72px; margin-bottom: 10px; padding-left: 30px; }
+  .channel-art.no-art { padding-left: 0; align-items: center; justify-content: center; }
+  .channel-badge {
+    position: absolute; left: -6px; bottom: -5px; width: 48px; height: 48px; z-index: 2;
+    border-radius: 50%; background: #FFF6E4; border: 2.5px solid #1C1511;
+    box-shadow: 2px 3px 0 rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center;
+    transform: rotate(-7deg);
+  }
+  .channel-badge svg { width: 36px; height: 36px; display: block; }
+  .badge-emoji { font-size: 1.4rem; line-height: 1; }
+  .channel-art.no-art .channel-badge { position: static; width: 60px; height: 60px; transform: rotate(-5deg); }
+  .channel-art.no-art .channel-badge svg { width: 46px; height: 46px; }
+  .channel-art.no-art .badge-emoji { font-size: 1.8rem; }
+  .channel-art img {
+    width: 42px; height: 62px; object-fit: cover; border-radius: 6px;
+    border: 1px solid rgba(240,251,244,0.25); box-shadow: 0 5px 12px rgba(0,0,0,0.5);
+    margin-right: -13px; transform: rotate(-5deg); background: var(--bg-elev);
+  }
+  .channel-art img:nth-child(even) { transform: rotate(4deg) translateY(2px); }
+  .channel-art img:last-child { margin-right: 0; }
 
   .panel {
     background: var(--bg-elev);
@@ -166,7 +221,7 @@
   .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
   .btn-ghost { background: var(--bg-elev-2); border: 1px solid var(--border); box-shadow: none; }
   .btn-small { padding: 7px 14px; font-size: 0.78rem; border-radius: 10px; }
-  .btn-teal { background: var(--teal); color: #05231d; box-shadow: 0 6px 16px rgba(34,211,180,0.3); }
+  .btn-teal { background: var(--teal); color: #05301f; box-shadow: 0 6px 16px rgba(69,230,176,0.3); }
 
   .row { display: flex; gap: 10px; }
   .row > * { flex: 1; }
@@ -266,7 +321,7 @@
 
   .theater-overlay {
     position: fixed; inset: 0; z-index: 9999;
-    background: rgba(8, 8, 14, 0.97);
+    background: rgba(3, 14, 16, 0.97);
     display: flex; flex-direction: column;
   }
   .theater-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; }
@@ -291,14 +346,14 @@
   .channel-grid { display: flex; flex-wrap: wrap; gap: 12px; }
   .channel-card {
     position: relative; flex: 1 1 165px; min-width: 165px; max-width: 240px;
-    background: linear-gradient(160deg, rgba(124,92,255,0.16), rgba(255,62,127,0.10)), var(--bg-elev-2);
+    background: linear-gradient(160deg, rgba(255,92,57,0.17), rgba(255,210,63,0.08)), var(--bg-elev-2);
     border: 1px solid var(--border); border-radius: 18px;
     padding: 20px 16px 16px; cursor: pointer;
     transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
   }
-  .channel-card:nth-child(3n) { background: linear-gradient(160deg, rgba(34,211,180,0.16), rgba(124,92,255,0.10)), var(--bg-elev-2); }
-  .channel-card:nth-child(3n+1) { background: linear-gradient(160deg, rgba(255,176,32,0.16), rgba(255,62,127,0.08)), var(--bg-elev-2); }
-  .channel-card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 12px 30px rgba(124,92,255,0.28); }
+  .channel-card:nth-child(3n) { background: linear-gradient(160deg, rgba(69,230,176,0.15), rgba(255,210,63,0.07)), var(--bg-elev-2); }
+  .channel-card:nth-child(3n+1) { background: linear-gradient(160deg, rgba(255,210,63,0.15), rgba(255,46,99,0.10)), var(--bg-elev-2); }
+  .channel-card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 12px 30px rgba(255,92,57,0.32); }
   .channel-card:active { transform: scale(0.98); }
   .channel-icon { font-size: 2.3rem; line-height: 1; margin-bottom: 10px; }
   .channel-name { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 1.02rem; color: var(--gold); }
@@ -310,7 +365,7 @@
     display: inline-flex; align-items: center; justify-content: center; line-height: 1;
   }
   .chip-btn:hover { border-color: var(--accent); }
-  .chip-btn.on { background: var(--teal); color: #05231d; border-color: var(--teal); font-weight: 800; }
+  .chip-btn.on { background: var(--teal); color: #05301f; border-color: var(--teal); font-weight: 800; }
   .icon-pick { width: 34px; height: 34px; font-size: 1.1rem; }
   .lineup-bar {
     display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -432,6 +487,24 @@
     <button class="tab-btn" data-tab="shuffle">🎲 Shuffle</button>
     <button class="tab-btn" data-tab="settings">⚙️ Settings</button>
   </nav>
+
+  <div class="welcome-overlay" id="welcome-overlay" style="display:none;">
+    <div class="welcome-card">
+      <div class="hero-eyebrow"><span class="rec-dot"></span>WELCOME TO</div>
+      <h1 class="welcome-title">Show Shuffler</h1>
+      <div class="color-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <p class="welcome-sub">Saturday-morning TV, reborn. No scrolling, no deciding — channels full of classics that just play.</p>
+      <div class="welcome-steps">
+        <div class="w-step"><span class="w-num">1</span><div><strong>Tap a channel</strong><br/>Random episodes play back-to-back, like real cable — static crackle included.</div></div>
+        <div class="w-step"><span class="w-num">2</span><div><strong>Make it yours</strong><br/>Profiles for each kid, your own shows, your own custom channels.</div></div>
+        <div class="w-step"><span class="w-num">3</span><div><strong>Log in anywhere</strong><br/>Your email brings everything to any device — no passwords, ever.</div></div>
+      </div>
+      <div class="welcome-actions">
+        <button class="btn" id="welcome-start" style="font-size:1.1rem; padding:15px 36px;">📺 Start watching</button>
+        <button class="btn btn-ghost btn-small" id="welcome-login">I have an account — log in</button>
+      </div>
+    </div>
+  </div>
 
   <div class="panel" id="search-panel" style="display:none;">
     <h2>🔍 Find shows</h2>
@@ -582,8 +655,8 @@
   let apiKey = 'fdb3cf1ab625cec36dc770dea7658560';
 
   // ▼▼▼ YOUTUBE SETUP — paste your YouTube API key between the quotes below ▼▼▼
-  // Without a key, the app works exactly as before (streaming buttons only).
-  // With a key, episodes that exist on YouTube get a "Play on this website" button.
+  // A key set here is BUILT IN: every visitor on every device uses it with no
+  // setup. (A key saved in ⚙️ Settings overrides it on that device only.)
   const YT_API_KEY = '';
   // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
   // The key can also be pasted in ⚙️ Settings — no code editing needed. A key
@@ -857,6 +930,22 @@
     el('region-select').value = region;
     updateYtKeyStatus();
   }
+
+  // ---------- First-visit welcome ----------
+  function dismissWelcome() {
+    try { localStorage.setItem('show-shuffler-welcomed', '1'); } catch (e) {}
+    const w = el('welcome-overlay');
+    if (w) w.style.display = 'none';
+  }
+  function maybeShowWelcome() {
+    let seen = false;
+    try { seen = localStorage.getItem('show-shuffler-welcomed') === '1'; } catch (e) {}
+    if (seen) return;
+    if (account && account.name) { dismissWelcome(); return; } // old friends skip it
+    el('welcome-overlay').style.display = 'flex';
+  }
+  el('welcome-start').addEventListener('click', () => { dismissWelcome(); switchTab('tv'); });
+  el('welcome-login').addEventListener('click', () => { dismissWelcome(); showRestoreDialog(); });
   el('region-select').addEventListener('change', (e) => {
     region = e.target.value;
     saveRegion();
@@ -1546,6 +1635,23 @@
     ] },
   ];
 
+  // Hand-drawn original badges for the built-in channels (our own art — real
+  // network logos are trademarks, so each channel gets its own sticker instead).
+  const STARTER_LOGOS = [
+    // Cartoon Classics — comic BOOM burst
+    '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><g transform="rotate(-4 32 32)"><path d="M32 4 38 20 54 12 46 26 62 32 46 38 53 53 38 44 32 60 26 44 11 52 18 38 2 32 18 26 11 12 26 20Z" fill="#FF5C39" stroke="#1C1511" stroke-width="3" stroke-linejoin="round"/><circle cx="32" cy="32" r="12" fill="#FFD23F" stroke="#1C1511" stroke-width="3"/><text x="32" y="38" font-size="17" font-weight="900" text-anchor="middle" fill="#1C1511" font-family="Sora,Arial">!!</text></g></svg>',
+    // Nick Rewind — wobbly VHS tape with rewind arrows
+    '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><g transform="rotate(3 32 32)"><rect x="6" y="13" width="52" height="38" rx="6" fill="#33333D" stroke="#1C1511" stroke-width="3"/><circle cx="21" cy="29" r="7" fill="#F0FBF4" stroke="#1C1511" stroke-width="3"/><circle cx="43" cy="29" r="7" fill="#F0FBF4" stroke="#1C1511" stroke-width="3"/><path d="M21 29h22" stroke="#1C1511" stroke-width="2.5"/><rect x="15" y="40" width="34" height="9" rx="2" fill="#FFD23F" stroke="#1C1511" stroke-width="2.5"/><path d="M35 41.5l-6 3 6 3zM43 41.5l-6 3 6 3z" fill="#1C1511"/></g></svg>',
+    // Disney Toons — generic storybook castle (our own crayon version)
+    '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><g transform="rotate(-3 32 32)"><rect x="10" y="30" width="12" height="26" fill="#9BD7FF" stroke="#1C1511" stroke-width="3"/><rect x="42" y="30" width="12" height="26" fill="#9BD7FF" stroke="#1C1511" stroke-width="3"/><rect x="22" y="24" width="20" height="32" fill="#CFEBFF" stroke="#1C1511" stroke-width="3"/><path d="M10 30l6-10 6 10zM42 30l6-10 6 10zM22 24l10-13 10 13z" fill="#FF5C39" stroke="#1C1511" stroke-width="3" stroke-linejoin="round"/><path d="M32 9V4" stroke="#1C1511" stroke-width="2.5"/><path d="M32 4l8 2-8 3z" fill="#FFD23F" stroke="#1C1511" stroke-width="2"/><rect x="28" y="43" width="8" height="13" rx="4" fill="#1C1511"/></g></svg>',
+    // Saturday Morning — sunrise over a cereal bowl
+    '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><g transform="rotate(2 32 32)"><circle cx="32" cy="25" r="11" fill="#FFD23F" stroke="#1C1511" stroke-width="3"/><path d="M32 8V3M46 11l4-4M18 11l-4-4M51 25h6M7 25h6" stroke="#1C1511" stroke-width="3" stroke-linecap="round"/><path d="M12 38h40l-4 11a9 9 0 01-9 7H25a9 9 0 01-9-7z" fill="#FF5C39" stroke="#1C1511" stroke-width="3" stroke-linejoin="round"/><path d="M16 38c4-4 11-4 16 0 5-4 12-4 16 0" fill="#F0FBF4" stroke="#1C1511" stroke-width="2.5"/><path d="M49 35l9-11" stroke="#1C1511" stroke-width="3.5" stroke-linecap="round"/></g></svg>',
+    // Anime Block — sakura blossom and a sparkle
+    '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><g transform="rotate(-5 32 32)"><g fill="#FF9EC4" stroke="#1C1511" stroke-width="3" stroke-linejoin="round"><path d="M32 11c5 5 5 11 0 15-5-4-5-10 0-15z"/><path d="M52 26c-2 7-7 10-13 8 1-6 6-10 13-8z"/><path d="M45 48c-7 1-12-2-13-8 6-2 11 1 13 8z"/><path d="M19 48c2-7 7-10 13-8-1 6-6 10-13 8z"/><path d="M12 26c7-2 12 1 13 8-6 2-11-1-13-8z"/></g><circle cx="32" cy="33" r="6" fill="#FFD23F" stroke="#1C1511" stroke-width="3"/><path d="M51 9l2 5 5 1-5 3-1 5-2-5-5-1 5-3z" fill="#F0FBF4" stroke="#1C1511" stroke-width="2"/></g></svg>',
+    // Little Kids — stacked ABC blocks
+    '<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><g stroke="#1C1511" stroke-width="3" stroke-linejoin="round"><rect x="18" y="8" width="21" height="21" rx="4" fill="#FFD23F" transform="rotate(-6 28 18)"/><rect x="7" y="33" width="21" height="21" rx="4" fill="#FF5C39" transform="rotate(3 17 43)"/><rect x="34" y="33" width="21" height="21" rx="4" fill="#45E6B0" transform="rotate(-2 44 43)"/></g><g font-family="Sora,Arial" font-weight="900" font-size="13" fill="#1C1511" text-anchor="middle"><text x="28" y="23" transform="rotate(-6 28 18)">A</text><text x="17" y="48" transform="rotate(3 17 43)">B</text><text x="44" y="48" transform="rotate(-2 44 43)">C</text></g></svg>',
+  ];
+
   let starterCache = null; // resolved {title|year: show|null}, cached per device
   function starterCacheLoad() {
     if (starterCache) return;
@@ -1589,19 +1695,62 @@
   function channelById(id) {
     if (id === 'all') return { id: 'all', name: 'All My Shows', icon: '🌈', shows: list };
     if (id && id.indexOf('starter:') === 0) {
-      const st = STARTER_CHANNELS[parseInt(id.slice(8), 10)];
+      const idx = parseInt(id.slice(8), 10);
+      const st = STARTER_CHANNELS[idx];
       if (!st) return null;
-      return { id: id, name: st.name, icon: st.icon, count: st.shows.length, getShows: () => resolveStarterChannel(st) };
+      return { id: id, name: st.name, icon: st.icon, logo: STARTER_LOGOS[idx] || null, count: st.shows.length, getShows: () => resolveStarterChannel(st) };
     }
     return (account.channels || []).find((c) => c.id === id) || null;
   }
 
-  function channelCardHtml(c, builtin, chNo) {
+  function badgeHtml(c) {
+    return '<div class="channel-badge">' + (c.logo ? c.logo : '<span class="badge-emoji">' + (c.icon || '📺') + '</span>') + '</div>';
+  }
+
+  function artAndBadgeHtml(c, paths) {
+    let imgs = '';
+    (paths || []).slice(0, 4).forEach((p) => {
+      imgs += '<img src="' + IMG_BASE + p + '" alt="" loading="lazy" onerror="this.remove()" />';
+    });
+    return '<div class="channel-art' + (imgs ? '' : ' no-art') + '">' + imgs + badgeHtml(c) + '</div>';
+  }
+
+  // Poster art for a built-in channel, from whatever titles are already resolved.
+  function starterArtPaths(st) {
+    starterCacheLoad();
+    const paths = [];
+    for (let i = 0; i < st.shows.length && paths.length < 4; i++) {
+      const e = st.shows[i];
+      const s = starterCache[e.t + '|' + (e.y || '')];
+      if (s && s.posterPath) paths.push(s.posterPath);
+    }
+    return paths;
+  }
+
+  // Quietly resolve the first few shows of each built-in channel so the cards
+  // get real show posters (this also pre-warms playback).
+  let artFillRunning = false;
+  async function fillStarterArt() {
+    if (artFillRunning) return;
+    artFillRunning = true;
+    try {
+      for (let i = 0; i < STARTER_CHANNELS.length; i++) {
+        const st = STARTER_CHANNELS[i];
+        if (starterArtPaths(st).length >= Math.min(4, st.shows.length)) continue;
+        await Promise.all(st.shows.slice(0, 5).map(resolveStarterShow));
+        const slot = document.querySelector('.channel-card[data-channel="starter:' + i + '"] .channel-art-slot');
+        if (slot) slot.innerHTML = artAndBadgeHtml({ icon: st.icon, logo: STARTER_LOGOS[i] || null }, starterArtPaths(st));
+      }
+    } catch (e) {}
+    artFillRunning = false;
+  }
+
+  function channelCardHtml(c, builtin, chNo, artPaths) {
     const inLineup = lineup.indexOf(c.id) !== -1;
     const count = c.shows ? c.shows.length : (c.count || 0);
     return '<div class="channel-card" data-channel="' + c.id + '">' +
       '<div class="channel-no">CH ' + pad2(chNo) + '</div>' +
-      '<div class="channel-icon">' + (c.icon || '📺') + '</div>' +
+      '<div class="channel-art-slot">' + artAndBadgeHtml(c, artPaths) + '</div>' +
       '<div class="channel-name">' + escapeHtml(c.name) + '</div>' +
       '<div class="channel-meta">' + count + ' shows</div>' +
       '<div class="channel-corner">' +
@@ -1616,11 +1765,12 @@
     if (!grid || !account) return;
     const channels = account.channels || [];
     lineup = lineup.filter((id) => channelById(id));
+    const postersOf = (shows) => (shows || []).map((s) => s.posterPath).filter(Boolean).slice(0, 4);
     let html = '';
     let chNo = 0;
-    STARTER_CHANNELS.forEach((st, i) => { chNo++; html += channelCardHtml({ id: 'starter:' + i, name: st.name, icon: st.icon, count: st.shows.length }, true, chNo); });
-    if (list.length) { chNo++; html += channelCardHtml({ id: 'all', name: 'All My Shows', icon: '🌈', shows: list }, true, chNo); }
-    channels.forEach((c) => { chNo++; html += channelCardHtml(c, false, chNo); });
+    STARTER_CHANNELS.forEach((st, i) => { chNo++; html += channelCardHtml({ id: 'starter:' + i, name: st.name, icon: st.icon, logo: STARTER_LOGOS[i] || null, count: st.shows.length }, true, chNo, starterArtPaths(st)); });
+    if (list.length) { chNo++; html += channelCardHtml({ id: 'all', name: 'All My Shows', icon: '🌈', shows: list }, true, chNo, postersOf(list)); }
+    channels.forEach((c) => { chNo++; html += channelCardHtml(c, false, chNo, postersOf(c.shows)); });
     grid.innerHTML = html;
     grid.querySelectorAll('.channel-card').forEach((card) => {
       card.addEventListener('click', () => {
@@ -1640,6 +1790,7 @@
       renderChannels();
     }));
     renderLineupBar();
+    fillStarterArt();
   }
 
   function renderLineupBar() {
@@ -1854,7 +2005,7 @@
       recordWatch(show.tmdbId);
     } else {
       // Browser blocked the auto-open — one tap finishes the jump.
-      banner.innerHTML = '<button class="yt-play-btn" id="portal-go" style="background: var(--accent, #7c5cff);">🌀 Tap to enter portal → ' + escapeHtml(providerName) + '</button>';
+      banner.innerHTML = '<button class="yt-play-btn" id="portal-go" style="background: var(--accent, #FF5C39);">🌀 Tap to enter portal → ' + escapeHtml(providerName) + '</button>';
       banner.querySelector('#portal-go').addEventListener('click', () => {
         window.open(url, '_blank');
         banner.innerHTML = '🌀 Portaled to <strong>' + escapeHtml(providerName) + '</strong> ✨ — countdown running';
@@ -2459,6 +2610,7 @@
     saveAutoplay();
     bubbleDismissed = true; // no need to nudge someone who just logged in
     saveBubbleState();
+    dismissWelcome();
     renderList();
     renderHistory();
     renderGreeting();
@@ -2629,6 +2781,7 @@
     el('autoplay-toggle').checked = autoplay;
     el('portal-toggle').checked = portalEnabled;
     renderResumeChip();
+    maybeShowWelcome();
     // If they arrived via a backup-email link, log them straight in.
     await maybeRestoreFromLink();
     // First visit (no named account, never dismissed): show the nudge after a moment.
