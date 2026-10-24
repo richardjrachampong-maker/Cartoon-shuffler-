@@ -31,8 +31,9 @@
   body {
     margin: 0;
     background: var(--bg);
-    background-image: radial-gradient(circle at 20% 0%, rgba(124,92,255,0.16), transparent 45%),
-                       radial-gradient(circle at 85% 15%, rgba(255,62,127,0.12), transparent 40%);
+    background-image: radial-gradient(circle at 20% 0%, rgba(124,92,255,0.18), transparent 45%),
+                       radial-gradient(circle at 85% 15%, rgba(255,62,127,0.14), transparent 40%),
+                       radial-gradient(circle at 50% 110%, rgba(34,211,180,0.10), transparent 55%);
     color: var(--text);
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
@@ -52,6 +53,68 @@
     color: transparent;
   }
   header p { font-size: 0.92rem; margin-top: 10px; color: var(--text-dim); }
+
+  /* ---- Retro broadcast hero ---- */
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    background: repeating-linear-gradient(0deg, rgba(255,255,255,0.028) 0 1px, transparent 1px 3px);
+  }
+  .wrap { position: relative; z-index: 2; }
+  .hero { padding-top: 18px; margin-bottom: 4px; }
+  .hero h1 {
+    font-size: clamp(2.7rem, 8vw, 4.4rem);
+    letter-spacing: -0.035em;
+    filter: drop-shadow(0 0 28px rgba(124,92,255,0.5));
+  }
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; letter-spacing: 0.38em;
+    color: var(--text-dim); text-transform: uppercase; margin-bottom: 14px;
+  }
+  .rec-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #ff4b4b; box-shadow: 0 0 12px #ff4b4b;
+    animation: recblink 1.6s ease infinite;
+  }
+  @keyframes recblink { 0%, 100% { opacity: 1; } 50% { opacity: 0.15; } }
+  .color-bars {
+    display: flex; width: min(430px, 74%); height: 9px;
+    margin: 18px auto 0; border-radius: 99px; overflow: hidden;
+    box-shadow: 0 0 26px rgba(255,255,255,0.14);
+  }
+  .color-bars i { flex: 1; }
+  .color-bars i:nth-child(1) { background: #eceff4; }
+  .color-bars i:nth-child(2) { background: #ffd23f; }
+  .color-bars i:nth-child(3) { background: #2fe3c6; }
+  .color-bars i:nth-child(4) { background: #39d353; }
+  .color-bars i:nth-child(5) { background: #ff3e7f; }
+  .color-bars i:nth-child(6) { background: #ff5349; }
+  .color-bars i:nth-child(7) { background: #7c5cff; }
+  .hero-tag { font-size: 0.96rem; margin-top: 16px; color: var(--text-dim); }
+
+  /* ---- Tab bar ---- */
+  .tabbar {
+    position: sticky; top: 12px; z-index: 60;
+    justify-content: center; gap: 6px;
+    margin: 22px auto 28px; padding: 6px; width: fit-content;
+    background: rgba(13, 13, 24, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border); border-radius: 999px;
+  }
+  .tab-btn {
+    border: none; background: transparent; color: var(--text-dim);
+    font-family: 'Sora', sans-serif; font-weight: 700; font-size: 0.92rem;
+    padding: 10px 22px; border-radius: 999px; cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { background: var(--gradient); color: #fff; box-shadow: 0 6px 20px rgba(255,62,127,0.35); }
+
+  /* ---- Settings groups + channel numbers ---- */
+  .channel-no { font-family: 'JetBrains Mono', monospace; font-size: 0.62rem; letter-spacing: 0.2em; color: var(--text-dim); margin-bottom: 8px; }
+  .set-group { margin-bottom: 28px; }
+  .set-group h3 { font-family: 'Sora', sans-serif; font-size: 0.98rem; margin: 0 0 8px; color: var(--gold); }
+  .set-hint { font-size: 0.8rem; color: var(--text-dim); margin: 8px 0 0; line-height: 1.5; }
+  .set-row { display: flex; gap: 8px; flex-wrap: wrap; }
 
   .panel {
     background: var(--bg-elev);
@@ -353,14 +416,22 @@
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1>📺 Show Shuffler</h1>
-    <p>Pick a channel. It just plays — like Saturday-morning TV.</p>
-    <p id="greeting" style="display:none; color: var(--teal); font-weight:600; font-size:0.85rem; margin-top:4px;"></p>
-    <p id="account-tools" style="display:none; margin-top:6px;">
+  <header class="hero">
+    <div class="hero-eyebrow"><span class="rec-dot"></span>NOW BROADCASTING</div>
+    <h1>Show Shuffler</h1>
+    <div class="color-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <p class="hero-tag">Your Saturday-morning TV. Pick a channel — it just plays.</p>
+    <p id="greeting" style="display:none; color: var(--teal); font-weight:600; font-size:0.85rem; margin-top:10px;"></p>
+    <p id="account-tools" style="display:none; margin-top:8px;">
       <button class="btn btn-ghost btn-small" id="profiles-btn">👤 Profiles</button>
     </p>
   </header>
+
+  <nav class="tabbar" id="tabbar" style="display:none;">
+    <button class="tab-btn active" data-tab="tv">📺 TV</button>
+    <button class="tab-btn" data-tab="shuffle">🎲 Shuffle</button>
+    <button class="tab-btn" data-tab="settings">⚙️ Settings</button>
+  </nav>
 
   <div class="panel" id="search-panel" style="display:none;">
     <h2>🔍 Find shows</h2>
@@ -391,9 +462,6 @@
       <button class="btn btn-ghost btn-small" id="lineup-clear-btn">✕ Clear</button>
     </div>
     <div class="error-msg" id="channels-error"></div>
-    <div style="text-align:center; margin-top:16px;">
-      <button class="btn btn-ghost btn-small" id="advanced-toggle" style="display:none;">⚙️ My shows &amp; settings</button>
-    </div>
   </div>
 
   <div class="panel" id="shuffle-panel" style="display:none;">
@@ -444,10 +512,6 @@
         </span>
         <span>Auto-portal — after a shuffle, count down 5 seconds and open the streaming service automatically</span>
       </label>
-      <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap;">
-        <button class="btn btn-ghost btn-small" id="services-btn">📺 My services</button>
-        <button class="btn btn-ghost btn-small" id="transfer-btn">📤 Move / back up my account</button>
-      </div>
     </div>
     <div class="error-msg" id="shuffle-error"></div>
   </div>
@@ -461,10 +525,41 @@
     <div class="empty" id="history-empty">Nothing watched yet — tap a service after shuffling to log it here.</div>
   </div>
 
+  <div class="panel" id="settings-panel" style="display:none;">
+    <h2>⚙️ Settings</h2>
+
+    <div class="set-group">
+      <h3>👤 Account &amp; profiles</h3>
+      <div class="set-row">
+        <button class="btn btn-ghost btn-small" id="profiles-btn-settings">👤 Profiles</button>
+        <button class="btn btn-ghost btn-small" id="transfer-btn">✉️ Email me my login link</button>
+        <button class="btn btn-ghost btn-small" id="login-btn">🔑 Log in on this device</button>
+      </div>
+      <p class="set-hint">Your login link carries everything — profiles, lists, channels — to any device. Open it in your email and tap it; that's the whole login.</p>
+    </div>
+
+    <div class="set-group">
+      <h3>▶️ YouTube key <span id="ytkey-status" style="font-size:0.75rem; font-weight:600; margin-left:6px;"></span></h3>
+      <p class="set-hint" style="margin:0 0 10px;">Channels play episodes right here through YouTube, powered by one free key. Get it at console.cloud.google.com → create a project → enable “YouTube Data API v3” → Credentials → Create API key. Paste it once below — it's remembered, and your login link carries it to other devices.</p>
+      <div class="row">
+        <input type="text" id="ytkey-input" placeholder="AIza…" autocomplete="off" />
+        <button class="btn btn-teal" id="ytkey-save" style="flex:0 0 auto;">Save key</button>
+      </div>
+    </div>
+
+    <div class="set-group">
+      <h3>📺 Streaming services</h3>
+      <div class="set-row">
+        <button class="btn btn-ghost btn-small" id="services-btn">📺 My services</button>
+      </div>
+      <p class="set-hint">Tick the services this profile actually has — the auto-portal only jumps to those.</p>
+    </div>
+  </div>
+
   <footer>
     Show + streaming-availability data via TMDB. Availability reflects TMDB's own watch-provider data (sourced from JustWatch) and may not always be complete or current.<br/>
     The countdown timer is based on the show's average runtime, not real playback — this app can't see what happens inside another site's video player.
-    <span id="footer-restore" style="display:none;"><br/><a href="#" id="footer-restore-link" style="color: var(--teal);">Have an account on another device? Log in with your transfer code or backup email →</a></span>
+    <span id="footer-restore" style="display:none;"><br/><a href="#" id="footer-restore-link" style="color: var(--teal);">Logging in from another device? Tap here →</a></span>
   </footer>
 </div>
 
@@ -491,6 +586,10 @@
   // With a key, episodes that exist on YouTube get a "Play on this website" button.
   const YT_API_KEY = '';
   // ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
+  // The key can also be pasted in ⚙️ Settings — no code editing needed. A key
+  // saved there wins; it's remembered on the device and travels in login links.
+  let ytKey = YT_API_KEY || '';
+  try { ytKey = localStorage.getItem('show-shuffler-ytkey') || YT_API_KEY || ''; } catch (e) { ytKey = YT_API_KEY || ''; }
 
   let list = [];
   let region = 'US';
@@ -506,7 +605,7 @@
   // Autoplay + profile state
   let autoplay = false;
   let portalEnabled = true;
-  let simpleMode = true;              // channels-only look; settings tucked away
+  let activeTab = 'tv';               // tv | shuffle | settings
   let lastProviderName = null;
   let profiles = [];                  // [{ name, email, createdAt, list, history, recent }]
   let activeProfile = 0;
@@ -586,7 +685,10 @@
     } catch (e) { region = 'US'; }
     try { autoplay = localStorage.getItem('cartoon-shuffler-autoplay') === '1'; } catch (e) { autoplay = false; }
     try { portalEnabled = localStorage.getItem('cartoon-shuffler-portal') !== '0'; } catch (e) { portalEnabled = true; }
-    try { simpleMode = localStorage.getItem('show-shuffler-simple') !== '0'; } catch (e) { simpleMode = true; }
+    try {
+      const t = localStorage.getItem('show-shuffler-tab');
+      if (t === 'tv' || t === 'shuffle' || t === 'settings') activeTab = t;
+    } catch (e) { activeTab = 'tv'; }
     try { lastProviderName = localStorage.getItem('cartoon-shuffler-last-provider') || null; } catch (e) { lastProviderName = null; }
     try { bubbleDismissed = localStorage.getItem('cartoon-shuffler-bubble-dismissed') === '1'; } catch (e) { bubbleDismissed = false; }
     try {
@@ -693,29 +795,68 @@
     return forRegion || null;
   }
 
-  // ---------- Setup ----------
-  function applySimpleMode() {
-    const d = simpleMode ? 'none' : 'block';
-    ['search-panel', 'list-panel', 'shuffle-panel', 'history-panel'].forEach((id) => {
-      const p = el(id);
-      if (p) p.style.display = d;
+  // ---------- Setup / tabs ----------
+  const TAB_PANELS = {
+    tv: ['channels-panel'],
+    shuffle: ['search-panel', 'list-panel', 'shuffle-panel', 'history-panel'],
+    settings: ['settings-panel'],
+  };
+
+  function applyTab() {
+    Object.keys(TAB_PANELS).forEach((tab) => {
+      TAB_PANELS[tab].forEach((id) => {
+        const p = el(id);
+        if (p) p.style.display = tab === activeTab ? 'block' : 'none';
+      });
     });
-    const t = el('advanced-toggle');
-    if (t) t.textContent = simpleMode ? '⚙️ My shows & settings' : '⬆ Hide shows & settings';
+    document.querySelectorAll('#tabbar [data-tab]').forEach((b) => {
+      if (b.getAttribute('data-tab') === activeTab) b.classList.add('active');
+      else b.classList.remove('active');
+    });
   }
+
+  function switchTab(tab) {
+    if (!TAB_PANELS[tab]) return;
+    activeTab = tab;
+    try { localStorage.setItem('show-shuffler-tab', tab); } catch (e) {}
+    applyTab();
+    window.scrollTo(0, 0);
+  }
+
+  document.querySelectorAll('#tabbar [data-tab]').forEach((b) => {
+    b.addEventListener('click', () => switchTab(b.getAttribute('data-tab')));
+  });
+
+  function updateYtKeyStatus() {
+    const s = el('ytkey-status');
+    if (!s) return;
+    s.textContent = ytKey ? '✅ saved' : '⚠️ not set';
+    s.style.color = ytKey ? 'var(--teal)' : 'var(--accent-2)';
+  }
+
+  el('ytkey-save').addEventListener('click', () => {
+    const v = el('ytkey-input').value.trim();
+    ytKey = v;
+    try {
+      if (v) localStorage.setItem('show-shuffler-ytkey', v);
+      else localStorage.removeItem('show-shuffler-ytkey');
+    } catch (e) {}
+    el('ytkey-input').value = '';
+    el('ytkey-input').placeholder = v ? 'Saved ✓' : 'AIza…';
+    updateYtKeyStatus();
+    const err = el('channels-error');
+    if (err) err.innerHTML = '';
+  });
+
+  el('profiles-btn-settings').addEventListener('click', showProfilesDialog);
+  el('login-btn').addEventListener('click', showRestoreDialog);
 
   function renderSetup() {
-    el('channels-panel').style.display = 'block';
-    el('advanced-toggle').style.display = 'inline-flex';
-    applySimpleMode();
+    el('tabbar').style.display = 'flex';
+    applyTab();
     el('region-select').value = region;
+    updateYtKeyStatus();
   }
-
-  el('advanced-toggle').addEventListener('click', () => {
-    simpleMode = !simpleMode;
-    try { localStorage.setItem('show-shuffler-simple', simpleMode ? '1' : '0'); } catch (e) {}
-    applySimpleMode();
-  });
   el('region-select').addEventListener('change', (e) => {
     region = e.target.value;
     saveRegion();
@@ -873,7 +1014,7 @@
   function pad2(n) { return String(n).padStart(2, '0'); }
 
   async function findYouTubeEpisode(show, episode) {
-    if (!YT_API_KEY) return null;
+    if (!ytKey) return null;
     const cacheKey = show.tmdbId + '-' + episode.season_number + '-' + episode.episode_number;
     if (cacheKey in ytCache) return ytCache[cacheKey];
     try {
@@ -886,7 +1027,7 @@
       async function ytSearch(q) {
         const res = await fetch(
           'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&safeSearch=moderate&maxResults=8' +
-          '&q=' + encodeURIComponent(q) + '&key=' + YT_API_KEY
+          '&q=' + encodeURIComponent(q) + '&key=' + ytKey
         );
         if (!res.ok) throw new Error('YouTube search HTTP ' + res.status);
         const data = await res.json();
@@ -896,7 +1037,7 @@
       async function bestMatch(ids) {
         if (!ids.length) return null;
         const res = await fetch(
-          'https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=' + ids.join(',') + '&key=' + YT_API_KEY
+          'https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status,snippet&id=' + ids.join(',') + '&key=' + ytKey
         );
         if (!res.ok) throw new Error('YouTube videos HTTP ' + res.status);
         const data = await res.json();
@@ -1032,9 +1173,14 @@
   // `shows` is an array, or an async function that loads the array (built-in channels).
   async function startChannelTV(name, shows) {
     const err = el('channels-error');
-    if (err) err.textContent = '';
-    if (!YT_API_KEY) {
-      if (err) err.textContent = 'Channel TV plays episodes right here through YouTube — the site needs its YouTube key pasted in first (the marked line near the top of index.html).';
+    if (err) err.innerHTML = '';
+    if (!ytKey) {
+      if (err) {
+        err.innerHTML = 'One free YouTube key powers the TV — add it once and every channel lights up. ' +
+          '<button class="btn btn-small" id="goto-settings-btn" style="margin-left:8px;">🔑 Add it in Settings</button>';
+        const b = el('goto-settings-btn');
+        if (b) b.addEventListener('click', () => switchTab('settings'));
+      }
       return;
     }
     const isLoader = typeof shows === 'function';
@@ -1343,7 +1489,7 @@
 
   async function attachYouTubeOption(show, episode) {
     const slot = el('yt-slot');
-    if (!slot || !YT_API_KEY) return;
+    if (!slot || !ytKey) return;
     slot.innerHTML = '<span class="np-hint">🔎 checking YouTube…</span>';
     const found = await findYouTubeEpisode(show, episode);
     const current = el('yt-slot');
@@ -1450,10 +1596,11 @@
     return (account.channels || []).find((c) => c.id === id) || null;
   }
 
-  function channelCardHtml(c, builtin) {
+  function channelCardHtml(c, builtin, chNo) {
     const inLineup = lineup.indexOf(c.id) !== -1;
     const count = c.shows ? c.shows.length : (c.count || 0);
     return '<div class="channel-card" data-channel="' + c.id + '">' +
+      '<div class="channel-no">CH ' + pad2(chNo) + '</div>' +
       '<div class="channel-icon">' + (c.icon || '📺') + '</div>' +
       '<div class="channel-name">' + escapeHtml(c.name) + '</div>' +
       '<div class="channel-meta">' + count + ' shows</div>' +
@@ -1470,9 +1617,10 @@
     const channels = account.channels || [];
     lineup = lineup.filter((id) => channelById(id));
     let html = '';
-    STARTER_CHANNELS.forEach((st, i) => { html += channelCardHtml({ id: 'starter:' + i, name: st.name, icon: st.icon, count: st.shows.length }, true); });
-    if (list.length) html += channelCardHtml({ id: 'all', name: 'All My Shows', icon: '🌈', shows: list }, true);
-    channels.forEach((c) => { html += channelCardHtml(c, false); });
+    let chNo = 0;
+    STARTER_CHANNELS.forEach((st, i) => { chNo++; html += channelCardHtml({ id: 'starter:' + i, name: st.name, icon: st.icon, count: st.shows.length }, true, chNo); });
+    if (list.length) { chNo++; html += channelCardHtml({ id: 'all', name: 'All My Shows', icon: '🌈', shows: list }, true, chNo); }
+    channels.forEach((c) => { chNo++; html += channelCardHtml(c, false, chNo); });
     grid.innerHTML = html;
     grid.querySelectorAll('.channel-card').forEach((card) => {
       card.addEventListener('click', () => {
@@ -2155,11 +2303,11 @@
     el('bubble-inner').innerHTML =
       '<div class="bubble-title">Create your account</div>' +
       '<input type="text" id="acct-name" placeholder="Your name" autocomplete="name" />' +
-      '<input type="email" id="acct-email" placeholder="Email (optional)" autocomplete="email" />' +
+      '<input type="email" id="acct-email" placeholder="Your email — it\'s how you log in anywhere" autocomplete="email" />' +
       '<div class="bubble-actions">' +
         '<button class="btn btn-small" id="acct-save-btn">Save my account</button>' +
       '</div>' +
-      '<div class="bubble-fineprint">Saved on this device — you\'ll be remembered automatically every time you come back. No password needed.</div>';
+      '<div class="bubble-fineprint">No password, ever. You\'re remembered on this device automatically, and your email is how you log in on any other one.</div>';
     el('acct-name').focus();
     el('acct-save-btn').addEventListener('click', () => {
       const name = el('acct-name').value.trim();
@@ -2171,7 +2319,7 @@
       renderGreeting();
       el('bubble-inner').innerHTML =
         '<div class="bubble-title">You\'re all set, ' + escapeHtml(name) + '! 🎉</div>' +
-        'Your shuffle list is saved and you\'ll be remembered automatically on this device. Tap "Move / back up my account" under your name anytime to email yourself a backup or move to another device.';
+        'You\'re saved on this device. To watch from anywhere, grab your magic link: ⚙️ Settings → “✉️ Email me my login link”.';
       setTimeout(() => { el('account-bubble').style.display = 'none'; }, 3500);
     });
   }
@@ -2219,6 +2367,7 @@
       profiles: named,
       region,
       autoplay,
+      ytKey: ytKey || undefined,
     };
     const json = JSON.stringify(payload);
     if (canZip) {
@@ -2300,6 +2449,11 @@
 
     region = payload.region || 'US';
     autoplay = payload.autoplay === true;
+    if (payload.ytKey && !ytKey) {
+      ytKey = payload.ytKey;
+      try { localStorage.setItem('show-shuffler-ytkey', ytKey); } catch (e) {}
+      updateYtKeyStatus();
+    }
     saveProfiles();
     await saveRegion();
     saveAutoplay();
@@ -2330,42 +2484,103 @@
   }
 
   async function showTransferDialog() {
-    if (!account || !account.name) return;
+    if (!account || !account.name) {
+      // No account yet — the login link needs one to carry.
+      el('bubble-inner').innerHTML =
+        '<div class="bubble-title">One quick step first 👋</div>' +
+        'Create your account (just a name and your email) — then your login link is one tap away.' +
+        '<div class="bubble-actions"><button class="btn btn-small" id="goto-create-btn">Create my account</button></div>';
+      el('account-bubble').style.display = 'block';
+      el('goto-create-btn').addEventListener('click', showAccountForm);
+      return;
+    }
     const code = await buildBackupCode();
     const link = backupLink(code);
     el('bubble-inner').innerHTML =
-      '<div class="bubble-title">Move or back up your account 📤</div>' +
-      'This code holds every profile on this device — names, show lists, and history.' +
-      '<textarea id="transfer-code-box" readonly rows="4" style="width:100%; margin-top:8px; font-family: \'JetBrains Mono\', monospace; font-size:0.68rem; background: var(--bg-elev-2); color: var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; resize:none;"></textarea>' +
+      '<div class="bubble-title">Your login link ✉️</div>' +
+      'We\'ll email you a magic link. Open that email on any device, tap the link, and you\'re in — profiles, channels, everything.' +
+      '<input type="email" id="backup-email-input" placeholder="you@example.com" autocomplete="email" style="margin-top:10px;" />' +
       '<div class="bubble-actions">' +
-        '<button class="btn btn-small" id="copy-code-btn">📋 Copy code</button>' +
-        '<button class="btn btn-small" id="email-backup-btn">✉️ Email myself a backup</button>' +
-        '<button class="btn btn-ghost btn-small" id="copy-link-btn">🔗 Copy backup link</button>' +
+        '<button class="btn btn-small" id="email-backup-btn">✉️ Email me my login link</button>' +
+        '<button class="btn btn-ghost btn-small" id="adv-code-btn">Advanced</button>' +
       '</div>' +
-      '<div class="bubble-fineprint">On your other device: open this site, tap the log-in link at the bottom, and paste the code. The email backup works the same way later — open it on any device and tap the link. The backup holds your account as of today, so re-send it after you\'ve added new shows.</div>';
+      '<div id="adv-code-area" style="display:none; margin-top:10px;">' +
+        '<textarea id="transfer-code-box" readonly rows="4" style="width:100%; font-family: \'JetBrains Mono\', monospace; font-size:0.68rem; background: var(--bg-elev-2); color: var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; resize:none;"></textarea>' +
+        '<div class="bubble-actions">' +
+          '<button class="btn btn-ghost btn-small" id="copy-code-btn">📋 Copy code</button>' +
+          '<button class="btn btn-ghost btn-small" id="copy-link-btn">🔗 Copy login link</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bubble-fineprint">The link carries everything as of right now — send yourself a fresh one after big changes. No password, nothing to remember.</div>';
     el('account-bubble').style.display = 'block';
+    el('backup-email-input').value = account.email || '';
     el('transfer-code-box').value = code;
     el('transfer-code-box').addEventListener('focus', function () { this.select(); });
+    el('adv-code-btn').addEventListener('click', () => {
+      const a = el('adv-code-area');
+      a.style.display = a.style.display === 'none' ? 'block' : 'none';
+    });
     el('copy-code-btn').addEventListener('click', () => copyText(code, el('copy-code-btn'), '✅ Copied!'));
     el('copy-link-btn').addEventListener('click', () => copyText(link, el('copy-link-btn'), '✅ Copied!'));
     el('email-backup-btn').addEventListener('click', () => {
-      const to = account.email ? encodeURIComponent(account.email) : '';
-      const subject = encodeURIComponent('My Show Shuffler backup');
+      const to = el('backup-email-input').value.trim();
+      if (to) { account.email = to; saveProfiles(); } // remember it for next time
+      const subject = encodeURIComponent('My Show Shuffler login link');
       const body = encodeURIComponent(
-        'Keep this email! Open it on any device and tap the link below to log back in to Show Shuffler with all your shows.\n\n' +
+        'Keep this email! Tap the link below on any device to log in to Show Shuffler — all your profiles, shows, and channels come with it.\n\n' +
         link +
-        '\n\nIf the link doesn\'t open, copy this code and paste it into the "log in" box on the site instead:\n\n' +
+        '\n\nIf the link doesn\'t open, go to the site\'s Settings, tap "Log in on this device" then "Paste a code instead", and paste this:\n\n' +
         code
       );
-      location.href = 'mailto:' + to + '?subject=' + subject + '&body=' + body;
+      location.href = 'mailto:' + encodeURIComponent(to) + '?subject=' + subject + '&body=' + body;
     });
   }
 
+  // Email-first login. Codes still work, but live behind "Advanced".
   function showRestoreDialog() {
     el('bubble-inner').innerHTML =
-      '<div class="bubble-title">Log in with a code 🔑</div>' +
-      'Paste the transfer code from your other device, or the link from your backup email.' +
-      '<textarea id="restore-code-box" rows="4" placeholder="SHUF1-…" style="width:100%; margin-top:8px; font-family: \'JetBrains Mono\', monospace; font-size:0.68rem; background: var(--bg-elev-2); color: var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; resize:none;"></textarea>' +
+      '<div class="bubble-title">Log in ✉️</div>' +
+      'Type the email you use with Show Shuffler.' +
+      '<input type="email" id="login-email" placeholder="you@example.com" autocomplete="email" style="margin-top:10px;" />' +
+      '<div class="bubble-actions">' +
+        '<button class="btn btn-small" id="login-go-btn">Log me in</button>' +
+        '<button class="btn btn-ghost btn-small" id="login-code-btn">Paste a code instead</button>' +
+      '</div>';
+    el('account-bubble').style.display = 'block';
+    el('login-email').focus();
+    el('login-code-btn').addEventListener('click', showCodeRestore);
+    el('login-go-btn').addEventListener('click', () => {
+      const em = el('login-email').value.trim().toLowerCase();
+      if (!em) { el('login-email').style.outline = '2px solid var(--accent-2)'; return; }
+      const idx = profiles.findIndex((p) => (p.email || '').toLowerCase() === em);
+      if (idx >= 0) {
+        // The account lives on this device — straight in.
+        if (idx !== activeProfile) switchProfile(idx);
+        el('bubble-inner').innerHTML =
+          '<div class="bubble-title">Welcome back, ' + escapeHtml(account.name || 'friend') + '! 🎉</div>' +
+          'You\'re logged in — your shows and channels are ready.';
+        setTimeout(() => { el('account-bubble').style.display = 'none'; }, 3000);
+        return;
+      }
+      // Not on this device: their login email is the key.
+      el('bubble-inner').innerHTML =
+        '<div class="bubble-title">Check your email 📬</div>' +
+        'This device doesn\'t know that account yet — but your email does. Open the message called <strong>“My Show Shuffler login link”</strong> in <strong>' + escapeHtml(em) + '</strong> on this device and tap the link. Everything comes back instantly.' +
+        '<div class="bubble-actions">' +
+          '<button class="btn btn-small" id="login-ok-btn">Got it — opening my email</button>' +
+          '<button class="btn btn-ghost btn-small" id="login-code-btn2">Paste a code instead</button>' +
+        '</div>' +
+        '<div class="bubble-fineprint">Never sent yourself one? On a device where you\'re logged in: ⚙️ Settings → “✉️ Email me my login link”.</div>';
+      el('login-ok-btn').addEventListener('click', () => { el('account-bubble').style.display = 'none'; });
+      el('login-code-btn2').addEventListener('click', showCodeRestore);
+    });
+  }
+
+  function showCodeRestore() {
+    el('bubble-inner').innerHTML =
+      '<div class="bubble-title">Paste a code 🔑</div>' +
+      'Paste the code (or the whole link) from your login email or your other device.' +
+      '<textarea id="restore-code-box" rows="4" placeholder="SHUF2-…" style="width:100%; margin-top:8px; font-family: \'JetBrains Mono\', monospace; font-size:0.68rem; background: var(--bg-elev-2); color: var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; resize:none;"></textarea>' +
       '<div class="error-msg" id="restore-error" style="display:none; margin-top:6px;">That code doesn\'t look right — make sure you copied the whole thing.</div>' +
       '<div class="bubble-actions">' +
         '<button class="btn btn-small" id="restore-go-btn">Log me in</button>' +
