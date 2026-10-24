@@ -757,6 +757,12 @@
   .tv-play:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
   .tv-status { color: var(--text-dim); font-size: 0.85rem; margin-top: 12px; min-height: 1.2em; }
   #tv-net-strip .network-chip.picked { box-shadow: 0 0 0 3px #F5B544, 0 6px 18px rgba(245,181,68,0.45); }
+  .tv-ext-card { background: rgba(255,255,255,0.04); border: 1px dashed rgba(245,181,68,0.5); border-radius: 16px; padding: 14px 16px; margin: 4px 0 14px; }
+  .tv-ext-title { font-family: 'Sora', sans-serif; font-weight: 800; font-size: 0.95rem; margin-bottom: 4px; }
+  .tv-ext-sub { color: var(--text-dim); font-size: 0.82rem; line-height: 1.45; }
+  .tv-ext-steps { margin: 10px 0 0; padding-left: 20px; font-size: 0.84rem; line-height: 1.6; color: var(--text); }
+  .tv-ext-steps a { color: #F5B544; font-weight: 700; }
+  .tv-ext-steps code { background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 6px; font-size: 0.8rem; }
   .theater-chan { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: #F5B544; font-weight: 800; display: block; margin-bottom: 2px; }
 
   /* ---------- Holiday shuffle filters ---------- */
@@ -1001,6 +1007,22 @@
     </div>
     <div class="network-heading" style="margin-top:10px;">Channels <span class="tv-pickhint" id="tv-pickhint">(tap to pick, tap again to remove)</span></div>
     <div class="home-net-strip" id="tv-net-strip"></div>
+    <div class="network-heading" style="margin-top:14px;">Free TV <span class="tv-pickhint">(Tubi, Pluto, Roku — plays in a new tab, auto-advances with the extension)</span></div>
+    <div class="tv-opts" id="tv-ext-row">
+      <button class="holiday-chip" data-ext="tubi" data-pid="73">Tubi</button>
+      <button class="holiday-chip" data-ext="pluto" data-pid="300">Pluto TV</button>
+      <button class="holiday-chip" data-ext="roku" data-pid="207">The Roku Channel</button>
+    </div>
+    <div class="tv-ext-card" id="tv-ext-card" style="display:none;">
+      <div class="tv-ext-title">Get the Show Shuffler TV extension</div>
+      <div class="tv-ext-sub">Free TV channels play on the service's own site in a new tab. The extension notices when an episode ends and switches that tab to the next one — like a remote. Desktop Chrome, Edge or Brave.</div>
+      <ol class="tv-ext-steps">
+        <li><a href="showshuffler-tv-extension.zip" download>Download the extension</a> and unzip it.</li>
+        <li>Open <code>chrome://extensions</code>, turn on <b>Developer mode</b> (top right).</li>
+        <li>Click <b>Load unpacked</b> and pick the unzipped <code>ext</code> folder.</li>
+        <li>Reload this page — this card disappears when it's detected.</li>
+      </ol>
+    </div>
     <div class="tv-opts">
       <button class="holiday-chip active" id="tv-cartoons">Cartoons only</button>
       <button class="holiday-chip" id="tv-mylist">Include my shows</button>
@@ -2698,6 +2720,7 @@
   function ytBudgetOk() {
     const u = ytUsage();
     if (u.dead) return false;
+    if (typeof tvActive !== 'undefined' && tvActive) return u.u < YT_DAILY_BUDGET; // TV: no hourly pacing
     const now = new Date();
     const h = now.getHours() + now.getMinutes() / 60;
     const START = 8, END = 22; // pace between 8am and 10pm local time
@@ -3090,12 +3113,12 @@
     stoppedEpKey = null; // playing again — clear the stop lock
     lastProviderName = WEBSITE_PROVIDER;
     saveLastProvider();
-    addToHistory(show, episode);
-    recordWatch(show.tmdbId);
+    if (!episode.tvVideo) { addToHistory(show, episode); recordWatch(show.tmdbId); }
     openTheater(show, episode, videoId, null);
   }
 
   function theaterTitleText(show, episode) {
+    if (episode && episode.tvVideo) return '\u{1F4FA} ' + tvLabel + '  \u2022  ' + (episode.name || show.title);
     return (tvActive ? '\u{1F4FA} ' + tvLabel + '  \u2022  ' : '') + show.title + ' · S' + episode.season_number + 'E' + episode.episode_number +
       (episode.name ? ' · ' + episode.name : '');
   }
@@ -3245,6 +3268,7 @@
 
   async function preloadNext() {
     pendingNext = null;
+    if (tvActive) return; // TV has its own queue
     try {
       const next = await pickFreshEpisode();
       if (!next || !theaterState) return;
@@ -3265,8 +3289,9 @@
   async function advanceOnSite() {
     let next = pendingNext;
     pendingNext = null;
-    if (tvActive && (!next || !next.videoId)) {
-      next = await tvFindPlayable(12);
+    if (tvActive) {
+      next = await tvNext();
+      if (!next) next = await tvFindPlayable(4);
       if (!next) { closeTheater(false); exitTV(); const st = el('tv-status'); if (st) st.textContent = 'Ran out of playable episodes for now — pick another channel.'; switchView('tv'); return; }
     }
     if (!next) {
@@ -3284,8 +3309,7 @@
       const t = document.getElementById('theater-title');
       if (t) t.textContent = theaterTitleText(next.show, next.episode);
       try { theaterPlayer.loadVideoById(next.videoId); } catch (e) { closeTheater(false); return; }
-      addToHistory(next.show, next.episode);
-      recordWatch(next.show.tmdbId);
+      if (!next.episode.tvVideo) { addToHistory(next.show, next.episode); recordWatch(next.show.tmdbId); }
       preloadNext();
     } else {
       // Next one isn't on YouTube — hand off to the normal card + service flow.
@@ -3475,6 +3499,7 @@
       if (!id) return;
       b.addEventListener('click', () => {
         if (tvPicked.has(id)) tvPicked.delete(id); else tvPicked.add(id);
+        if (tvPicked.size && tvExtPick) { tvExtPick = null; const r = el('tv-ext-row'); if (r) r.querySelectorAll('[data-ext]').forEach((x) => x.classList.remove('active')); updateExtCard(); }
         renderTvStrip(); updateTvPlay();
       });
     });
@@ -3487,16 +3512,124 @@
   function updateTvPlay() {
     const btn = el('tv-play'); const st = el('tv-status');
     if (!btn) return;
-    const ok = tvPicked.size > 0 || (tvIncludeList && list.length > 0);
+    const ok = tvPicked.size > 0 || !!tvExtPick || (tvIncludeList && list.length > 0);
     btn.disabled = !ok;
-    if (st && !tvActive) st.textContent = ok ? (tvPicked.size ? tvPickedNames().join(' + ') : 'My shows') + ' — press play.' : 'Pick at least one channel.';
+    if (st && !tvActive) st.textContent = ok ? (tvExtPick ? tvExtPick.label + ' (free TV) — press play.' : (tvPicked.size ? tvPickedNames().join(' + ') : 'My shows') + ' — press play.') : 'Pick at least one channel.';
   }
   (function wireTv() {
     const c = el('tv-cartoons'), m = el('tv-mylist'), p = el('tv-play');
     if (c) c.addEventListener('click', () => { tvCartoonsOnly = !tvCartoonsOnly; c.classList.toggle('active', tvCartoonsOnly); });
     if (m) m.addEventListener('click', () => { tvIncludeList = !tvIncludeList; m.classList.toggle('active', tvIncludeList); updateTvPlay(); });
-    if (p) p.addEventListener('click', startTV);
+    if (p) p.addEventListener('click', () => { if (tvExtPick) startExtTV(); else startTV(); });
   })();
+
+  // ---- Free TV via the Show Shuffler TV browser extension ----
+  let ssExt = null; let tvExtPick = null; // {token, pid, label}
+  const TV_EXT_PROVIDERS = { tubi: 'Tubi', pluto: 'Pluto TV', roku: 'The Roku Channel' };
+  window.addEventListener('message', (ev) => {
+    if (ev.source !== window || !ev.data) return;
+    if (ev.data.type === 'SS_EXT_READY') { ssExt = ev.data.version || '1'; updateExtCard(); }
+    if (ev.data.type === 'SS_PLAYLIST_ACK') { const st = el('tv-status'); if (st && tvExtPick) st.textContent = 'Now on: ' + tvExtPick.label + ' — ' + ev.data.count + ' episodes queued (auto-advances in the new tab).'; }
+  });
+  function extDetected() { return !!ssExt || document.documentElement.getAttribute('data-ss-ext'); }
+  function updateExtCard() {
+    const card = el('tv-ext-card'); if (!card) return;
+    card.style.display = (tvExtPick && !extDetected()) ? 'block' : 'none';
+  }
+  (function wireExt() {
+    const row = el('tv-ext-row'); if (!row) return;
+    row.querySelectorAll('[data-ext]').forEach((b) => {
+      b.addEventListener('click', () => {
+        const tok = b.getAttribute('data-ext');
+        if (tvExtPick && tvExtPick.token === tok) tvExtPick = null;
+        else { tvExtPick = { token: tok, pid: parseInt(b.getAttribute('data-pid'), 10), label: TV_EXT_PROVIDERS[tok] }; tvPicked.clear(); renderTvStrip(); }
+        row.querySelectorAll('[data-ext]').forEach((x) => x.classList.toggle('active', !!tvExtPick && x.getAttribute('data-ext') === tvExtPick.token));
+        updateExtCard(); updateTvPlay();
+      });
+    });
+    setTimeout(() => window.postMessage({ type: 'SS_PING' }, '*'), 500);
+  })();
+
+  // Shows on this free service (TMDB watch-provider data), cartoons-only aware.
+  async function extPool(pid) {
+    const pages = await Promise.all([1, 2].map((page) => {
+      const params = { with_watch_providers: pid, watch_region: region || 'US', with_original_language: 'en', sort_by: 'popularity.desc', page };
+      if (tvCartoonsOnly) params.with_genres = 16;
+      return tmdbFetch('/discover/tv', params).catch(() => ({ results: [] }));
+    }));
+    const seen = {}; const out = [];
+    pages.forEach((d) => (d.results || []).forEach((r) => { if (!seen[r.id]) { seen[r.id] = 1; out.push({ tmdbId: r.id, title: r.name, posterPath: r.poster_path }); } }));
+    if (tvIncludeList) list.forEach((x) => { if (!seen[x.tmdbId]) { seen[x.tmdbId] = 1; out.push(x); } });
+    return shuffleArr(out);
+  }
+  // Build a playlist of exact episode URLs on that service (via Watchmode).
+  async function extBuildPlaylist(pick, max) {
+    const pool = await extPool(pick.pid);
+    const items = []; let tries = 0;
+    for (const show of pool) {
+      if (items.length >= max || tries >= 14) break;
+      tries++;
+      try {
+        const d = await getShowDetails(show.tmdbId);
+        const seasons = d.number_of_seasons || 1;
+        const sn = 1 + Math.floor(Math.random() * seasons);
+        const eps = await getSeasonEpisodes(show.tmdbId, sn);
+        if (!eps || !eps.length) continue;
+        const ep = eps[Math.floor(Math.random() * eps.length)];
+        const map = await wmEpisodeLinks(show.tmdbId, ep.season_number, ep.episode_number, region || 'US');
+        const url = map && map[pick.token];
+        if (url) items.push({ url, title: show.title + ' · S' + ep.season_number + 'E' + ep.episode_number + (ep.name ? ' · ' + ep.name : '') });
+      } catch (e) { /* next show */ }
+    }
+    return items;
+  }
+  async function startExtTV() {
+    const st = el('tv-status'); const btn = el('tv-play');
+    btn.disabled = true;
+    if (!extDetected()) { updateExtCard(); st.textContent = 'Install the extension first (steps above), then press Play.'; btn.disabled = false; return; }
+    if (!watchmodeKey) { st.textContent = 'Episode links need auto-links turned on (admin).'; btn.disabled = false; return; }
+    st.textContent = 'Finding episodes on ' + tvExtPick.label + '…';
+    try {
+      const items = await extBuildPlaylist(tvExtPick, 12);
+      if (!items.length) { st.textContent = 'Couldn\'t find episode links on ' + tvExtPick.label + ' right now — try turning off "Cartoons only" or another service.'; btn.disabled = false; return; }
+      const first = items.shift();
+      window.postMessage({ type: 'SS_PLAYLIST', items, label: tvExtPick.label, current: { title: first.title, service: tvExtPick.label, mins: 25 } }, '*');
+      st.textContent = 'Now on: ' + tvExtPick.label + ' — ' + (items.length + 1) + ' episodes queued (auto-advances in the new tab).';
+      window.open(first.url, '_blank');
+    } catch (e) { st.textContent = 'Something went wrong — try again.'; }
+    btn.disabled = false;
+  }
+
+  // Shuffle-mode queue for the extension: the next few picks, each resolved to
+  // an exact episode link on a service this profile has. Any service, any show.
+  async function extQueueShuffles(curShow, curEp, curProvider, curMins) {
+    try {
+      const items = []; let tries = 0;
+      while (items.length < 4 && tries < 8) {
+        tries++;
+        const p = await pickFreshEpisode();
+        if (!p) break;
+        const k = epKey(p.show.tmdbId, p.episode.season_number, p.episode.episode_number);
+        if (sessionSeen.indexOf(k) === -1) sessionSeen.push(k); // don't re-serve what we queued
+        const prov = await getWatchProviders(p.show.tmdbId, region);
+        let flat = ((prov && prov.flatrate) || []).slice();
+        const mine = (account && Array.isArray(account.services)) ? account.services : null;
+        if (mine && mine.length) {
+          const only = flat.filter((x) => mine.indexOf(providerKey(x.provider_name)) !== -1);
+          if (only.length) flat = only;
+        }
+        if (!flat.length) continue;
+        const pick = flat[0];
+        const url = await bestLinkFor(pick.provider_name, p.show, p.episode);
+        if (!url) continue;
+        const mins = p.episode.displayRuntime || p.episode.runtime || p.show.avgRuntimeMin || 22;
+        items.push({ url, title: theaterTitleText(p.show, p.episode), service: pick.provider_name, mins });
+      }
+      if (!items.length) return;
+      window.postMessage({ type: 'SS_PLAYLIST', items, label: 'Shuffle',
+        current: { title: theaterTitleText(curShow, curEp), service: curProvider, mins: curMins } }, '*');
+    } catch (e) { /* queue is a bonus — never block playback */ }
+  }
 
   function shuffleArr(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 
@@ -3519,29 +3652,134 @@
     return shuffleArr(pool);
   }
 
+  // ---- TV source engine: official network channels on YouTube ----
+  // One channel search per network (cached 30 days) + its uploads list (1 unit
+  // per 50 videos) + duration/embeddable check (1 unit per 50). Hundreds of
+  // playable episodes for ~15 units — instead of 100 units per single search.
+  let tvQueue = [];
+  let tvChanCache = {};
+  try { tvChanCache = JSON.parse(localStorage.getItem('ss-tv-channels') || '{}'); } catch (e) {}
+  const TV_CARTOON_NETS = ['Cartoon Network', 'Nickelodeon', 'Disney Channel', 'Disney XD', 'Adult Swim', 'Boomerang', 'Nick Jr.', 'Nicktoons'];
+  const TV_NOT_EP = ['reaction', 'reacts', 'review', 'recap', 'breakdown', 'explained', 'top 10', 'top ten', 'trailer', 'teaser',
+    'promo', 'behind the scenes', 'best moments', 'funniest moments', 'compilation', 'marathon', 'sneak peek', 'preview',
+    'music video', 'song', 'theme song', 'intro', 'opening', 'live stream', 'livestream', 'shorts', '#shorts', 'minisode', 'clip'];
+
+  async function tvResolveNetworkChannel(name) {
+    const hit = tvChanCache[name];
+    if (hit && hit.id && (Date.now() - hit.t) < 30 * 24 * 60 * 60 * 1000) return hit;
+    if (!ytBudgetOk()) return null;
+    try {
+      ytSpend(100);
+      const res = await fetch('https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&maxResults=5&q=' +
+        encodeURIComponent(name) + '&key=' + ytKey);
+      if (!res.ok) { try { const eb = await res.json(); const r = eb.error && eb.error.errors && eb.error.errors[0] && eb.error.errors[0].reason; if (r === 'quotaExceeded' || r === 'dailyLimitExceeded') ytMarkExhausted(); } catch (e2) {} return null; }
+      const data = await res.json();
+      const want = normName(name);
+      const items = (data.items || []).filter((i) => i.snippet && i.snippet.channelId && !isChannelBlocked(i.snippet.channelId));
+      const pick = items.find((i) => normName(i.snippet.title).indexOf(want) !== -1) || items[0];
+      if (!pick) return null;
+      const out = { id: pick.snippet.channelId, title: pick.snippet.title || name, t: Date.now() };
+      tvChanCache[name] = out;
+      try { localStorage.setItem('ss-tv-channels', JSON.stringify(tvChanCache)); } catch (e) {}
+      return out;
+    } catch (e) { return null; }
+  }
+
+  async function tvVideoDetails(ids) {
+    const out = {};
+    for (let i = 0; i < ids.length; i += 50) {
+      if (!ytBudgetOk()) break;
+      ytSpend(1);
+      try {
+        const res = await fetch('https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status&id=' + ids.slice(i, i + 50).join(',') + '&key=' + ytKey);
+        if (!res.ok) break;
+        const data = await res.json();
+        (data.items || []).forEach((v) => {
+          out[v.id] = { mins: isoDurationMinutes(v.contentDetails && v.contentDetails.duration), emb: !(v.status && v.status.embeddable === false) };
+        });
+      } catch (e) { break; }
+    }
+    return out;
+  }
+
+  function tvLooksLikeEpisode(title, poolTitles, requirePool) {
+    const t = title.toLowerCase();
+    if (TV_NOT_EP.some((w) => t.indexOf(w) !== -1)) return null;
+    const show = poolTitles.find((pt) => pt.key.length > 3 && t.indexOf(pt.key) !== -1) || null;
+    if (requirePool && !show) return null;
+    const evidence = show || t.indexOf('full episode') !== -1 || /\bs\d{1,2}\s*[.·|x -]*\s*e\d{1,3}\b/.test(t) || /\bepisode\s*\d+/.test(t);
+    return evidence ? { show } : null;
+  }
+
+  async function tvBuildQueue() {
+    const queue = []; const seen = {};
+    const poolTitles = tvPool.map((p) => ({ key: p.title.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim(), show: p }));
+    const names = tvPickedNames();
+    for (const name of names) {
+      const chan = await tvResolveNetworkChannel(name);
+      if (!chan || isChannelBlocked(chan.id)) continue;
+      const vids = await getChannelCatalog(chan.id);
+      if (!vids || !vids.length) continue;
+      const requirePool = tvCartoonsOnly && TV_CARTOON_NETS.indexOf(name) === -1; // mixed networks: only pool (cartoon) shows
+      const cands = [];
+      vids.forEach((v) => {
+        if (seen[v.id]) return;
+        const m = tvLooksLikeEpisode(v.t || '', poolTitles, requirePool);
+        if (m) { seen[v.id] = 1; cands.push({ id: v.id, title: v.t, show: m.show }); }
+      });
+      const det = await tvVideoDetails(cands.slice(0, 200).map((c) => c.id));
+      cands.forEach((c) => {
+        const d = det[c.id];
+        if (!d || !d.emb || !d.mins || d.mins < 8 || d.mins > 50) return;
+        queue.push({ videoId: c.id, title: c.title, mins: d.mins, channelId: chan.id, channelTitle: chan.title, net: name, show: c.show ? c.show.show : null });
+      });
+    }
+    return shuffleArr(queue);
+  }
+
+  function tvItemToPick(it) {
+    const m = (it.title || '').match(/s(\d{1,2})\s*[.·|x -]*\s*e(\d{1,3})/i);
+    const show = it.show || { tmdbId: 0, title: it.net, posterPath: null, numberOfSeasons: 1, avgRuntimeMin: it.mins };
+    const episode = { season_number: m ? parseInt(m[1], 10) : 0, episode_number: m ? parseInt(m[2], 10) : 0, name: it.title, tvVideo: true, runtime: it.mins };
+    rememberChannel({ videoId: it.videoId, channelId: it.channelId, channelTitle: it.channelTitle });
+    return { show, episode, videoId: it.videoId };
+  }
+  async function tvNext() {
+    if (!tvQueue.length) { try { tvQueue = await tvBuildQueue(); } catch (e) { tvQueue = []; } }
+    const it = tvQueue.shift();
+    return it ? tvItemToPick(it) : null;
+  }
+
   async function startTV() {
     const st = el('tv-status'); const btn = el('tv-play');
     btn.disabled = true;
     st.textContent = 'Tuning in…';
     try {
       tvPool = await buildTvPool();
-      if (!tvPool.length) { st.textContent = 'No shows found for those channels. Try different ones.'; btn.disabled = false; return; }
       tvLabel = tvPicked.size ? tvPickedNames().join(' + ') : 'My shows';
       tvActive = true;
       tvPrevAutoplay = autoplay; autoplay = true;
-      const first = await tvFindPlayable(12);
+      tvQueue = await tvBuildQueue();
+      // Fallback for "my shows" with no channel picked: find a few via the exact matcher.
+      if (!tvQueue.length && tvIncludeList && !tvPicked.size) {
+        const f = await tvFindPlayable(6);
+        if (f) { st.textContent = 'Now on: ' + tvLabel; startSitePlayback(f.show, f.episode, f.videoId); return; }
+      }
+      const first = await tvNext();
       if (!first) {
+        const u = ytUsage();
         exitTV();
-        st.textContent = 'Couldn\'t find any episodes on YouTube for these channels right now (no official uploads, or today\'s lookup limit). Try another channel or come back later.';
+        st.textContent = u.dead ? 'YouTube lookups are maxed out for today — they reset overnight.' :
+          'Couldn\'t find full episodes on these channels\' official YouTube pages right now. Try adding Cartoon Network or Nickelodeon.';
         btn.disabled = false; return;
       }
-      st.textContent = 'Now on: ' + tvLabel;
+      st.textContent = 'Now on: ' + tvLabel + ' — ' + (tvQueue.length + 1) + ' episodes queued';
       startSitePlayback(first.show, first.episode, first.videoId);
     } catch (e) {
       exitTV(); st.textContent = 'Something went wrong tuning in — try again.'; btn.disabled = false;
     }
   }
-  // Keep picking until we land on an episode YouTube actually has.
+  // Fallback: keep picking until we land on an episode YouTube actually has (exact matcher).
   async function tvFindPlayable(maxTries) {
     for (let i = 0; i < maxTries; i++) {
       let p = null;
@@ -3554,7 +3792,7 @@
   }
   function exitTV() {
     if (!tvActive) return;
-    tvActive = false; tvPool = [];
+    tvActive = false; tvPool = []; tvQueue = [];
     if (tvPrevAutoplay !== null) { autoplay = tvPrevAutoplay; tvPrevAutoplay = null; }
     const btn = el('tv-play'); if (btn) btn.disabled = false;
     updateTvPlay();
@@ -3864,6 +4102,8 @@
         startTimer(mins);
         addToHistory(show, episode);
         recordWatch(show.tmdbId);
+        // Extension installed? Queue the next picks so the service tab auto-advances.
+        if (extDetected()) extQueueShuffles(show, episode, tagEl.getAttribute('data-provider') || '', mins);
       });
     });
 
